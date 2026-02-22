@@ -1,0 +1,182 @@
+"""Background ingestion worker that polls for new JSONL files."""
+
+import os
+import threading
+import traceback
+
+from .config import CLAUDE_PROJECTS_DIR
+
+
+class IngestionWorker(threading.Thread):
+    """Daemon thread that polls ~/.claude/projects/ for changed JSONL files.
+
+    When changes are detected, runs the fast pipeline (everything except
+    LLM judging, which is expensive and user-triggered).
+
+    The ``status`` attribute is a dict visible to other threads:
+      {"state": "idle"/"ingesting"/"judging", "step": "...", "ready": True/False,
+       "current": N, "total": N}
+    """
+
+    def __init__(self, interval: float = 30.0, run_immediately: bool = False):
+        super().__init__(daemon=True, name="ingestion-worker")
+        self.interval = interval
+        self._run_immediately = run_immediately
+        self._stop_event = threading.Event()
+        self._known_mtimes: dict[str, float] = {}
+        self.status: dict = {"state": "idle", "step": "", "ready": True,
+                             "current": 0, "total": 0}
+        self._refresh_request: dict | None = None
+        self._refresh_lock = threading.Lock()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def request_refresh(self, concurrency: int = 12):
+        """Request a full refresh (ingest + judge) from the UI thread.
+
+        Non-blocking — sets a flag that the worker picks up on its next loop.
+        """
+        with self._refresh_lock:
+            self._refresh_request = {"concurrency": concurrency}
+
+    @property
+    def is_busy(self) -> bool:
+        return self.status.get("state") not in ("idle",)
+
+    def run(self):
+        if self._run_immediately:
+            try:
+                self._run_pipeline()
+            except Exception:
+                traceback.print_exc()
+                self._set_idle()
+
+        while not self._stop_event.is_set():
+            try:
+                # Check for user-triggered refresh request
+                req = None
+                with self._refresh_lock:
+                    if self._refresh_request:
+                        req = self._refresh_request
+                        self._refresh_request = None
+
+                if req:
+                    self._run_full_refresh(req.get("concurrency", 12))
+                elif self._has_changes():
+                    self._run_pipeline()
+            except Exception:
+                traceback.print_exc()
+                self._set_idle()
+            self._stop_event.wait(self.interval)
+
+    def _has_changes(self) -> bool:
+        """Scan JSONL files and return True if any are new or modified."""
+        if not CLAUDE_PROJECTS_DIR.exists():
+            return False
+
+        changed = False
+        current_files: dict[str, float] = {}
+
+        for root, _dirs, files in os.walk(CLAUDE_PROJECTS_DIR):
+            for fname in files:
+                if not fname.endswith(".jsonl"):
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    mtime = os.path.getmtime(fpath)
+                except OSError:
+                    continue
+                current_files[fpath] = mtime
+                if fpath not in self._known_mtimes or self._known_mtimes[fpath] < mtime:
+                    changed = True
+
+        self._known_mtimes = current_files
+        return changed
+
+    def _set_status(self, step: str, current: int = 0, total: int = 0, state: str = "ingesting"):
+        self.status = {
+            "state": state, "step": step, "ready": False,
+            "current": current, "total": total,
+        }
+
+    def _set_idle(self):
+        self.status = {"state": "idle", "step": "", "ready": True,
+                       "current": 0, "total": 0}
+
+    def _run_pipeline(self):
+        """Run the fast ingestion pipeline (no LLM judging)."""
+        from .ingest import run_ingest
+        from .sessions import build_sessions, build_tool_usage
+        from .features import extract_features
+        from .scoring import compute_scores
+        from .intents import classify_all_intents
+        from .baselines import compute_baselines
+        from .prescriptions import generate_prescriptions
+
+        n = 8
+        self._set_status("Ingesting JSONL files", 1, n)
+        run_ingest()
+        self._set_status("Building sessions", 2, n)
+        build_sessions()
+        self._set_status("Analyzing tool usage", 3, n)
+        build_tool_usage()
+        self._set_status("Extracting features", 4, n)
+        extract_features()
+        self._set_status("Computing scores", 5, n)
+        compute_scores()
+        self._set_status("Classifying intents", 6, n)
+        classify_all_intents()
+        self._set_status("Computing baselines", 7, n)
+        compute_baselines()
+        self._set_status("Generating prescriptions", 8, n)
+        generate_prescriptions()
+        self._set_idle()
+
+    def _run_full_refresh(self, concurrency: int = 12):
+        """Run the full pipeline including LLM judging with progress."""
+        from .ingest import run_ingest
+        from .sessions import build_sessions, build_tool_usage
+        from .features import extract_features
+        from .scoring import compute_scores
+        from .intents import classify_all_intents
+        from .baselines import compute_baselines
+        from .prescriptions import generate_prescriptions
+        from .llm_judge import judge_sessions
+
+        # Phase 1: fast pipeline (8 steps)
+        n = 8
+        self._set_status("Ingesting JSONL files", 1, n)
+        run_ingest()
+        self._set_status("Building sessions", 2, n)
+        build_sessions()
+        self._set_status("Analyzing tool usage", 3, n)
+        build_tool_usage()
+        self._set_status("Extracting features", 4, n)
+        extract_features()
+        self._set_status("Computing scores", 5, n)
+        compute_scores()
+        self._set_status("Classifying intents", 6, n)
+        classify_all_intents()
+        self._set_status("Computing baselines", 7, n)
+        compute_baselines()
+        self._set_status("Generating prescriptions", 8, n)
+        generate_prescriptions()
+
+        # Phase 2: LLM judging (reports per-session progress)
+        def on_judge_progress(done, total, ok, errors):
+            self._set_status(
+                f"Judging sessions ({ok} ok, {errors} errors)",
+                current=done, total=total, state="judging",
+            )
+
+        self._set_status("Starting LLM judge", 0, 0, state="judging")
+        judge_sessions(concurrency=concurrency, progress_callback=on_judge_progress)
+
+        # Phase 3: recompute baselines/prescriptions with new judgments
+        self._set_status("Recomputing baselines", 1, 2)
+        compute_baselines()
+        self._set_status("Regenerating prescriptions", 2, 2)
+        generate_prescriptions()
+
+        self._set_idle()

@@ -1,49 +1,39 @@
-"""LLM-as-Observer: session analysis via claude -p."""
+"""LLM-as-Observer: session analysis via Anthropic-compatible API."""
 
 import json
 import os
-import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
+
+from anthropic import Anthropic
 
 from .db import get_conn
 
 # How many sessions to judge in parallel
 CONCURRENCY = 12
 
+# Defaults — override with ANTHROPIC_BASE_URL / ANTHROPIC_API_KEY / CLAUDE_RETRO_MODEL
+_DEFAULT_BASE_URL = "http://localhost:8082"
+_DEFAULT_MODEL = "sonnet"
 
-def _subprocess_env() -> dict:
-    """Build an env dict that includes common macOS CLI paths.
 
-    Inside a PyInstaller .app bundle, the user's shell PATH is not inherited.
-    We prepend well-known locations so ``claude`` can be found.
-    """
-    env = os.environ.copy()
-    extra = [
-        "/usr/local/bin",
-        str(Path.home() / ".local" / "bin"),
-        "/opt/homebrew/bin",
-        str(Path.home() / ".claude" / "local"),
-    ]
-    env["PATH"] = ":".join(extra) + ":" + env.get("PATH", "")
-    return env
+def _get_client() -> Anthropic:
+    return Anthropic(
+        base_url=os.environ.get("ANTHROPIC_BASE_URL", _DEFAULT_BASE_URL),
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "unused"),
+    )
 
 
 def call_claude(prompt: str) -> str:
-    """Run claude -p, piping the prompt via stdin. Return stdout text."""
-    result = subprocess.run(
-        ["claude", "-p"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        env=_subprocess_env(),
+    """Call the Anthropic-compatible API. Return response text."""
+    client = _get_client()
+    model = os.environ.get("CLAUDE_RETRO_MODEL", _DEFAULT_MODEL)
+    resp = client.messages.create(
+        model=model,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
     )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"claude -p failed (exit {result.returncode}): {result.stderr[:500]}"
-        )
-    return result.stdout.strip()
+    return resp.content[0].text.strip()
 
 
 def build_session_summary(session_id: str, conn) -> tuple[str, int]:
@@ -212,7 +202,7 @@ def _parse_json_response(text: str) -> dict:
 
 
 def analyze_outcome(session_id: str, summary: str) -> dict:
-    """Call claude -p for outcome/prompt quality analysis."""
+    """Call LLM for outcome/prompt quality analysis."""
     prompt = _OUTCOME_PROMPT.format(summary=summary)
     raw = call_claude(prompt)
     try:
@@ -232,7 +222,7 @@ def analyze_outcome(session_id: str, summary: str) -> dict:
 
 
 def analyze_trajectory(session_id: str, summary: str, turn_count: int = 0) -> dict:
-    """Call claude -p for trajectory analysis."""
+    """Call LLM for trajectory analysis."""
     prompt = _TRAJECTORY_PROMPT.format(summary=summary, turn_count=turn_count)
     raw = call_claude(prompt)
     try:

@@ -56,7 +56,7 @@ class TestBuildSessions:
         assert count1 == n1
 
         # Rebuild again
-        n2 = build_sessions()
+        build_sessions()
         count2 = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
         assert count2 == count1, "Rebuild should not lose sessions"
 

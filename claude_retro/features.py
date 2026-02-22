@@ -3,7 +3,9 @@
 import math
 import re
 from .config import (
-    CORRECTION_MARKERS, REPHRASING_MARKERS, DECISION_MARKERS,
+    CORRECTION_MARKERS,
+    REPHRASING_MARKERS,
+    DECISION_MARKERS,
     TOOL_CATEGORIES,
 )
 from .db import get_conn
@@ -67,13 +69,51 @@ def _topic_keyword_entropy(texts: list[str], window_size: int = 3) -> float:
 
     # Extract keywords (simple: split on non-alpha, filter short words)
     def keywords(text):
-        words = set(re.findall(r'[a-z]{3,}', text.lower()))
+        words = set(re.findall(r"[a-z]{3,}", text.lower()))
         # Filter very common words
-        stop = {'the', 'and', 'for', 'that', 'this', 'with', 'you', 'are', 'was',
-                'have', 'has', 'not', 'but', 'can', 'from', 'they', 'been', 'will',
-                'would', 'could', 'should', 'about', 'into', 'more', 'some', 'like',
-                'just', 'also', 'than', 'them', 'then', 'when', 'what', 'which',
-                'there', 'their', 'your', 'all', 'any', 'each', 'how'}
+        stop = {
+            "the",
+            "and",
+            "for",
+            "that",
+            "this",
+            "with",
+            "you",
+            "are",
+            "was",
+            "have",
+            "has",
+            "not",
+            "but",
+            "can",
+            "from",
+            "they",
+            "been",
+            "will",
+            "would",
+            "could",
+            "should",
+            "about",
+            "into",
+            "more",
+            "some",
+            "like",
+            "just",
+            "also",
+            "than",
+            "them",
+            "then",
+            "when",
+            "what",
+            "which",
+            "there",
+            "their",
+            "your",
+            "all",
+            "any",
+            "each",
+            "how",
+        }
         return words - stop
 
     kw_sets = [keywords(t) for t in texts]
@@ -115,55 +155,77 @@ def extract_features():
 def _extract_session_features(session_id: str, conn):
     """Extract all features for a single session."""
     # Get user prompts (non-tool-result)
-    user_rows = conn.execute("""
+    user_rows = conn.execute(
+        """
         SELECT user_text, user_text_length, timestamp_utc
         FROM raw_entries
         WHERE session_id = ? AND entry_type = 'user'
           AND NOT is_tool_result AND user_text_length > 0
         ORDER BY timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     # Get assistant responses
-    assistant_rows = conn.execute("""
+    assistant_rows = conn.execute(
+        """
         SELECT text_length, input_tokens, output_tokens, tool_names, timestamp_utc
         FROM raw_entries
         WHERE session_id = ? AND entry_type = 'assistant'
         ORDER BY timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     # Get system entries for timing
-    system_rows = conn.execute("""
+    system_rows = conn.execute(
+        """
         SELECT duration_ms FROM raw_entries
         WHERE session_id = ? AND entry_type = 'system' AND system_subtype = 'turn_duration'
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     # Get session info
-    session_info = conn.execute("""
+    session_info = conn.execute(
+        """
         SELECT started_at, tool_use_count FROM sessions WHERE session_id = ?
-    """, [session_id]).fetchone()
+    """,
+        [session_id],
+    ).fetchone()
 
     # Get sidechain count
-    sidechain_count = conn.execute("""
+    sidechain_count = conn.execute(
+        """
         SELECT COUNT(*) FROM raw_entries
         WHERE session_id = ? AND is_sidechain = TRUE
-    """, [session_id]).fetchone()[0]
+    """,
+        [session_id],
+    ).fetchone()[0]
 
     # Get branch switches
-    branches = conn.execute("""
+    branches = conn.execute(
+        """
         SELECT DISTINCT git_branch FROM raw_entries
         WHERE session_id = ? AND git_branch IS NOT NULL
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     # Prompt metrics
     prompt_lengths = [r[1] for r in user_rows]
     prompt_texts = [r[0] for r in user_rows]
-    avg_prompt_length = sum(prompt_lengths) / len(prompt_lengths) if prompt_lengths else 0
+    avg_prompt_length = (
+        sum(prompt_lengths) / len(prompt_lengths) if prompt_lengths else 0
+    )
     prompt_length_trend = _linear_trend([float(x) for x in prompt_lengths])
     max_prompt_length = max(prompt_lengths) if prompt_lengths else 0
 
     # Response metrics
     response_lengths = [r[0] for r in assistant_rows if r[0] > 0]
-    avg_response_length = sum(response_lengths) / len(response_lengths) if response_lengths else 0
+    avg_response_length = (
+        sum(response_lengths) / len(response_lengths) if response_lengths else 0
+    )
     response_length_trend = _linear_trend([float(x) for x in response_lengths])
     response_length_cv = _coefficient_of_variation([float(x) for x in response_lengths])
 
@@ -172,7 +234,6 @@ def _extract_session_features(session_id: str, conn):
     total_output = sum(r[2] for r in assistant_rows)
 
     # Tool ratios
-    tool_use_count = session_info[1] if session_info else 0
     all_tools = []
     for r in assistant_rows:
         if r[3]:
@@ -198,6 +259,7 @@ def _extract_session_features(session_id: str, conn):
     day_of_week = 0
     if session_info and session_info[0]:
         from datetime import timezone
+
         started_utc = session_info[0].replace(tzinfo=timezone.utc)
         started_local = started_utc.astimezone()
         hour_of_day = started_local.hour
@@ -210,16 +272,28 @@ def _extract_session_features(session_id: str, conn):
     decision_count = _count_markers(prompt_texts, DECISION_MARKERS)
 
     # All text for combined markers (user + assistant)
-    all_texts = prompt_texts + [r[0] for r in conn.execute("""
+    all_texts = prompt_texts + [
+        r[0]
+        for r in conn.execute(
+            """
         SELECT text_content FROM raw_entries
         WHERE session_id = ? AND entry_type = 'assistant' AND text_length > 0
-    """, [session_id]).fetchall()]
+    """,
+            [session_id],
+        ).fetchall()
+    ]
     decision_count += _count_markers(
-        [r[0] for r in conn.execute("""
+        [
+            r[0]
+            for r in conn.execute(
+                """
             SELECT text_content FROM raw_entries
             WHERE session_id = ? AND entry_type = 'assistant' AND text_length > 0
-        """, [session_id]).fetchall()],
-        DECISION_MARKERS
+        """,
+                [session_id],
+            ).fetchall()
+        ],
+        DECISION_MARKERS,
     )
 
     # Topic entropy (from user prompts)
@@ -235,9 +309,13 @@ def _extract_session_features(session_id: str, conn):
     abandoned = len(prompt_texts) <= 1
 
     # PR link detection
-    has_pr = any("pull request" in t.lower() or "pr #" in t.lower() or
-                 "github.com" in t.lower() and "/pull/" in t.lower()
-                 for t in all_texts)
+    has_pr = any(
+        "pull request" in t.lower()
+        or "pr #" in t.lower()
+        or "github.com" in t.lower()
+        and "/pull/" in t.lower()
+        for t in all_texts
+    )
 
     # Branch switches
     branch_switch_count = max(0, len(branches) - 1)
@@ -246,24 +324,50 @@ def _extract_session_features(session_id: str, conn):
     prompt_oscillation = _oscillation_score([float(x) for x in prompt_lengths])
 
     # API errors (from assistant entries with error markers)
-    api_errors = conn.execute("""
+    api_errors = conn.execute(
+        """
         SELECT COUNT(*) FROM raw_entries
         WHERE session_id = ? AND entry_type = 'system' AND system_subtype = 'api_error'
-    """, [session_id]).fetchone()[0]
+    """,
+        [session_id],
+    ).fetchone()[0]
 
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO session_features VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
-    """, [
-        session_id, avg_prompt_length, prompt_length_trend, max_prompt_length,
-        avg_response_length, response_length_trend, response_length_cv,
-        total_input, total_output,
-        edit_write_ratio, read_grep_ratio, bash_ratio, task_ratio, web_ratio,
-        unique_tools, avg_turn_duration,
-        hour_of_day, day_of_week,
-        correction_count, correction_rate, rephrasing_count, decision_count,
-        topic_entropy, sidechain_count, sidechain_ratio,
-        abandoned, has_pr,
-        branch_switch_count, prompt_oscillation, api_errors,
-    ])
+    """,
+        [
+            session_id,
+            avg_prompt_length,
+            prompt_length_trend,
+            max_prompt_length,
+            avg_response_length,
+            response_length_trend,
+            response_length_cv,
+            total_input,
+            total_output,
+            edit_write_ratio,
+            read_grep_ratio,
+            bash_ratio,
+            task_ratio,
+            web_ratio,
+            unique_tools,
+            avg_turn_duration,
+            hour_of_day,
+            day_of_week,
+            correction_count,
+            correction_rate,
+            rephrasing_count,
+            decision_count,
+            topic_entropy,
+            sidechain_count,
+            sidechain_ratio,
+            abandoned,
+            has_pr,
+            branch_switch_count,
+            prompt_oscillation,
+            api_errors,
+        ],
+    )

@@ -26,8 +26,7 @@ def needs_ingestion(file_path: Path, conn) -> bool:
     """Check if file needs (re-)ingestion based on mtime."""
     mtime = os.path.getmtime(file_path)
     result = conn.execute(
-        "SELECT mtime FROM ingestion_log WHERE file_path = ?",
-        [str(file_path)]
+        "SELECT mtime FROM ingestion_log WHERE file_path = ?", [str(file_path)]
     ).fetchone()
     if result is None:
         return True
@@ -162,26 +161,46 @@ def ingest_file(file_path: Path, project_name: str, conn) -> int:
 
     # Batch insert using INSERT OR REPLACE
     for entry in entries:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO raw_entries VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
-        """, [
-            entry["entry_id"], entry["session_id"], entry["project_name"],
-            entry["entry_type"], entry["timestamp_utc"], entry["parent_uuid"],
-            entry["is_sidechain"], entry["user_text"], entry["user_text_length"],
-            entry["is_tool_result"], entry["tool_result_error"], entry["model"],
-            entry["content_types"], entry["tool_names"], entry["text_content"],
-            entry["text_length"], entry["input_tokens"], entry["output_tokens"],
-            entry["system_subtype"], entry["duration_ms"], entry["git_branch"],
-            entry["cwd"],
-        ])
+        """,
+            [
+                entry["entry_id"],
+                entry["session_id"],
+                entry["project_name"],
+                entry["entry_type"],
+                entry["timestamp_utc"],
+                entry["parent_uuid"],
+                entry["is_sidechain"],
+                entry["user_text"],
+                entry["user_text_length"],
+                entry["is_tool_result"],
+                entry["tool_result_error"],
+                entry["model"],
+                entry["content_types"],
+                entry["tool_names"],
+                entry["text_content"],
+                entry["text_length"],
+                entry["input_tokens"],
+                entry["output_tokens"],
+                entry["system_subtype"],
+                entry["duration_ms"],
+                entry["git_branch"],
+                entry["cwd"],
+            ],
+        )
 
     # Update ingestion log
     mtime = os.path.getmtime(file_path)
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO ingestion_log VALUES (?, ?, ?, current_timestamp)
-    """, [str(file_path), mtime, len(entries)])
+    """,
+        [str(file_path), mtime, len(entries)],
+    )
 
     return len(entries)
 
@@ -191,7 +210,12 @@ def run_ingest() -> dict:
     conn = get_conn()
     files = find_jsonl_files()
 
-    stats = {"total_files": len(files), "ingested_files": 0, "total_entries": 0, "skipped_files": 0}
+    stats = {
+        "total_files": len(files),
+        "ingested_files": 0,
+        "total_entries": 0,
+        "skipped_files": 0,
+    }
 
     for file_path, project_name in files:
         if not needs_ingestion(file_path, conn):
@@ -202,8 +226,14 @@ def run_ingest() -> dict:
         stats["total_entries"] += count
 
     # Get total counts
-    stats["total_entries_in_db"] = conn.execute("SELECT COUNT(*) FROM raw_entries").fetchone()[0]
-    stats["total_sessions_found"] = conn.execute("SELECT COUNT(DISTINCT session_id) FROM raw_entries WHERE session_id IS NOT NULL").fetchone()[0]
-    stats["total_projects"] = conn.execute("SELECT COUNT(DISTINCT project_name) FROM raw_entries").fetchone()[0]
+    stats["total_entries_in_db"] = conn.execute(
+        "SELECT COUNT(*) FROM raw_entries"
+    ).fetchone()[0]
+    stats["total_sessions_found"] = conn.execute(
+        "SELECT COUNT(DISTINCT session_id) FROM raw_entries WHERE session_id IS NOT NULL"
+    ).fetchone()[0]
+    stats["total_projects"] = conn.execute(
+        "SELECT COUNT(DISTINCT project_name) FROM raw_entries"
+    ).fetchone()[0]
 
     return stats

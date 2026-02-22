@@ -40,7 +40,9 @@ def call_claude(prompt: str) -> str:
         env=_subprocess_env(),
     )
     if result.returncode != 0:
-        raise RuntimeError(f"claude -p failed (exit {result.returncode}): {result.stderr[:500]}")
+        raise RuntimeError(
+            f"claude -p failed (exit {result.returncode}): {result.stderr[:500]}"
+        )
     return result.stdout.strip()
 
 
@@ -55,13 +57,16 @@ def build_session_summary(session_id: str, conn) -> tuple[str, int]:
     total number of meaningful action rounds (user messages + assistant
     tool-call batches), which is what the LLM should evaluate for productivity.
     """
-    entries = conn.execute("""
+    entries = conn.execute(
+        """
         SELECT entry_type, timestamp_utc, user_text, tool_names,
                is_tool_result, tool_result_error, system_subtype, duration_ms
         FROM raw_entries
         WHERE session_id = ? AND NOT is_sidechain
         ORDER BY timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     if not entries:
         return "", 0
@@ -72,7 +77,16 @@ def build_session_summary(session_id: str, conn) -> tuple[str, int]:
     is_first_user = True
     turn_num = 0
 
-    for entry_type, ts, user_text, tool_names, is_tool_result, tool_error, sys_sub, dur_ms in entries:
+    for (
+        entry_type,
+        ts,
+        user_text,
+        tool_names,
+        is_tool_result,
+        tool_error,
+        sys_sub,
+        dur_ms,
+    ) in entries:
         elapsed = ""
         if ts and first_ts:
             delta = (ts - first_ts).total_seconds()
@@ -192,7 +206,7 @@ def _parse_json_response(text: str) -> dict:
     if text.startswith("```"):
         lines = text.split("\n")
         # Remove first and last fence lines
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         text = "\n".join(lines)
     return json.loads(text)
 
@@ -256,7 +270,6 @@ def _build_record(session_id, summary, turn_count=0):
     # Validate: if LLM returned fewer turns than expected, adjust
     if turn_count > 0 and total < turn_count:
         # LLM undercounted — distribute the missing turns proportionally
-        missing = turn_count - total
         if total > 0:
             productive = round(productive * turn_count / total)
             waste = turn_count - productive
@@ -274,7 +287,9 @@ def _build_record(session_id, summary, turn_count=0):
             waste = min_waste
             productive = max(0, total - waste)
 
-    ratio = productive / total if total > 0 else trajectory.get("productivity_ratio", 0.0)
+    ratio = (
+        productive / total if total > 0 else trajectory.get("productivity_ratio", 0.0)
+    )
 
     return {
         "session_id": session_id,
@@ -328,8 +343,9 @@ def judge_session(session_id: str, conn) -> dict:
     return record
 
 
-def judge_sessions(force: bool = False, concurrency: int = CONCURRENCY,
-                    progress_callback=None) -> int:
+def judge_sessions(
+    force: bool = False, concurrency: int = CONCURRENCY, progress_callback=None
+) -> int:
     """Judge all unjudged sessions (incremental). Returns count judged.
 
     Runs `concurrency` sessions in parallel (each session runs its 2 LLM
@@ -368,7 +384,11 @@ def judge_sessions(force: bool = False, concurrency: int = CONCURRENCY,
         turn_counts[sid] = work_turns
 
     # Filter out empty summaries
-    work = [(sid, summaries[sid], turn_counts[sid]) for sid, _ in session_rows if summaries[sid]]
+    work = [
+        (sid, summaries[sid], turn_counts[sid])
+        for sid, _ in session_rows
+        if summaries[sid]
+    ]
     total = len(work)
     if total == 0:
         if progress_callback:
@@ -382,7 +402,9 @@ def judge_sessions(force: bool = False, concurrency: int = CONCURRENCY,
     count = 0
     errors = 0
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
-        futures = {pool.submit(_judge_one, sid, summary, tc): sid for sid, summary, tc in work}
+        futures = {
+            pool.submit(_judge_one, sid, summary, tc): sid for sid, summary, tc in work
+        }
         for future in as_completed(futures):
             sid, result = future.result()
             if isinstance(result, Exception):
@@ -390,7 +412,9 @@ def judge_sessions(force: bool = False, concurrency: int = CONCURRENCY,
                 print(f"  Warning: {sid[:12]}...: {result}", file=sys.stderr)
             else:
                 # Write to DB (single-threaded to avoid DuckDB contention)
-                conn.execute("DELETE FROM session_judgments WHERE session_id = ?", [sid])
+                conn.execute(
+                    "DELETE FROM session_judgments WHERE session_id = ?", [sid]
+                )
                 cols = ", ".join(result.keys())
                 placeholders = ", ".join(["?"] * len(result))
                 conn.execute(

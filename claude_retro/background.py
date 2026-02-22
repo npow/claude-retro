@@ -24,8 +24,13 @@ class IngestionWorker(threading.Thread):
         self._run_immediately = run_immediately
         self._stop_event = threading.Event()
         self._known_mtimes: dict[str, float] = {}
-        self.status: dict = {"state": "idle", "step": "", "ready": True,
-                             "current": 0, "total": 0}
+        self.status: dict = {
+            "state": "idle",
+            "step": "",
+            "ready": True,
+            "current": 0,
+            "total": 0,
+        }
         self._refresh_request: dict | None = None
         self._refresh_lock = threading.Lock()
 
@@ -94,15 +99,25 @@ class IngestionWorker(threading.Thread):
         self._known_mtimes = current_files
         return changed
 
-    def _set_status(self, step: str, current: int = 0, total: int = 0, state: str = "ingesting"):
+    def _set_status(
+        self, step: str, current: int = 0, total: int = 0, state: str = "ingesting"
+    ):
         self.status = {
-            "state": state, "step": step, "ready": False,
-            "current": current, "total": total,
+            "state": state,
+            "step": step,
+            "ready": False,
+            "current": current,
+            "total": total,
         }
 
     def _set_idle(self):
-        self.status = {"state": "idle", "step": "", "ready": True,
-                       "current": 0, "total": 0}
+        self.status = {
+            "state": "idle",
+            "step": "",
+            "ready": True,
+            "current": 0,
+            "total": 0,
+        }
 
     def _run_pipeline(self):
         """Run the fast ingestion pipeline (no LLM judging)."""
@@ -167,7 +182,9 @@ class IngestionWorker(threading.Thread):
         def on_judge_progress(done, total, ok, errors):
             self._set_status(
                 f"Judging sessions ({ok} ok, {errors} errors)",
-                current=done, total=total, state="judging",
+                current=done,
+                total=total,
+                state="judging",
             )
 
         self._set_status("Starting LLM judge", 0, 0, state="judging")

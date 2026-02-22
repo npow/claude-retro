@@ -44,23 +44,38 @@ class TestBuildRecord:
         import unittest.mock as mock
 
         def mock_outcome(*args):
-            return {"outcome": "completed", "outcome_confidence": 0.8,
-                    "outcome_reasoning": "test", "prompt_clarity": 0.7,
-                    "prompt_completeness": 0.6, "prompt_missing": [],
-                    "prompt_summary": "test", "_raw": ""}
+            return {
+                "outcome": "completed",
+                "outcome_confidence": 0.8,
+                "outcome_reasoning": "test",
+                "prompt_clarity": 0.7,
+                "prompt_completeness": 0.6,
+                "prompt_missing": [],
+                "prompt_summary": "test",
+                "_raw": "",
+            }
 
         def mock_trajectory(*args):
-            return {"trajectory_summary": "test", "underspecified_parts": [],
-                    "misalignment_count": 5, "misalignments": [
-                        {"turn": i, "description": f"mistake {i}"} for i in range(1, 6)
-                    ],
-                    "correction_count": 0, "corrections": [],
-                    "productive_turns": 1, "waste_turns": 0,
-                    "productivity_ratio": 1.0,
-                    "waste_breakdown": {}, "_raw": ""}
+            return {
+                "trajectory_summary": "test",
+                "underspecified_parts": [],
+                "misalignment_count": 5,
+                "misalignments": [
+                    {"turn": i, "description": f"mistake {i}"} for i in range(1, 6)
+                ],
+                "correction_count": 0,
+                "corrections": [],
+                "productive_turns": 1,
+                "waste_turns": 0,
+                "productivity_ratio": 1.0,
+                "waste_breakdown": {},
+                "_raw": "",
+            }
 
-        with mock.patch("claude_retro.llm_judge.analyze_outcome", mock_outcome), \
-             mock.patch("claude_retro.llm_judge.analyze_trajectory", mock_trajectory):
+        with (
+            mock.patch("claude_retro.llm_judge.analyze_outcome", mock_outcome),
+            mock.patch("claude_retro.llm_judge.analyze_trajectory", mock_trajectory),
+        ):
             record = _build_record("test-session", "fake summary", turn_count=10)
 
         # Should NOT be 100% productive with 5 misalignments
@@ -75,24 +90,41 @@ class TestBuildRecord:
         import unittest.mock as mock
 
         def mock_outcome(*args):
-            return {"outcome": "completed", "outcome_confidence": 0.9,
-                    "outcome_reasoning": "", "prompt_clarity": 0.8,
-                    "prompt_completeness": 0.7, "prompt_missing": [],
-                    "prompt_summary": "", "_raw": ""}
+            return {
+                "outcome": "completed",
+                "outcome_confidence": 0.9,
+                "outcome_reasoning": "",
+                "prompt_clarity": 0.8,
+                "prompt_completeness": 0.7,
+                "prompt_missing": [],
+                "prompt_summary": "",
+                "_raw": "",
+            }
 
         def mock_trajectory(*args):
-            return {"trajectory_summary": "", "underspecified_parts": [],
-                    "misalignment_count": 0, "misalignments": [],
-                    "correction_count": 0, "corrections": [],
-                    "productive_turns": 7, "waste_turns": 3,
-                    "productivity_ratio": 0.5,  # intentionally wrong
-                    "waste_breakdown": {}, "_raw": ""}
+            return {
+                "trajectory_summary": "",
+                "underspecified_parts": [],
+                "misalignment_count": 0,
+                "misalignments": [],
+                "correction_count": 0,
+                "corrections": [],
+                "productive_turns": 7,
+                "waste_turns": 3,
+                "productivity_ratio": 0.5,  # intentionally wrong
+                "waste_breakdown": {},
+                "_raw": "",
+            }
 
-        with mock.patch("claude_retro.llm_judge.analyze_outcome", mock_outcome), \
-             mock.patch("claude_retro.llm_judge.analyze_trajectory", mock_trajectory):
+        with (
+            mock.patch("claude_retro.llm_judge.analyze_outcome", mock_outcome),
+            mock.patch("claude_retro.llm_judge.analyze_trajectory", mock_trajectory),
+        ):
             record = _build_record("test-session", "fake summary", turn_count=10)
 
-        expected = record["productive_turns"] / (record["productive_turns"] + record["waste_turns"])
+        expected = record["productive_turns"] / (
+            record["productive_turns"] + record["waste_turns"]
+        )
         assert abs(record["productivity_ratio"] - expected) < 0.01, (
             f"Ratio {record['productivity_ratio']} != computed {expected}"
         )

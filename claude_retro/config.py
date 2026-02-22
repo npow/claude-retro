@@ -5,7 +5,9 @@ from pathlib import Path
 
 # Paths
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
-DB_PATH = Path(os.environ.get("CLAUDE_RETRO_DB", Path.home() / ".claude" / "retro.duckdb"))
+DB_PATH = Path(
+    os.environ.get("CLAUDE_RETRO_DB", Path.home() / ".claude" / "retro.duckdb")
+)
 SERVER_PORT = int(os.environ.get("CLAUDE_RETRO_PORT", "8420"))
 
 # Scoring weights
@@ -47,33 +49,132 @@ BASELINE_WINDOWS = [14, 60]
 
 # Intent keywords (keyword -> intent, weight)
 INTENT_KEYWORDS = {
-    "debug": ["bug", "error", "fix", "broken", "crash", "fail", "issue", "wrong", "traceback", "exception", "debug", "stack trace"],
-    "implement": ["add", "create", "build", "implement", "new feature", "write", "make", "generate"],
-    "refactor": ["refactor", "clean up", "restructure", "reorganize", "rename", "extract", "simplify", "move"],
-    "research": ["how does", "what is", "explain", "understand", "look at", "find", "search", "where is", "show me"],
-    "brainstorm": ["idea", "think about", "consider", "brainstorm", "design", "plan", "approach", "strategy", "option"],
-    "review": ["review", "check", "audit", "look over", "examine", "inspect", "pr", "pull request"],
-    "prototype": ["prototype", "proof of concept", "poc", "experiment", "try", "test", "spike", "explore"],
+    "debug": [
+        "bug",
+        "error",
+        "fix",
+        "broken",
+        "crash",
+        "fail",
+        "issue",
+        "wrong",
+        "traceback",
+        "exception",
+        "debug",
+        "stack trace",
+    ],
+    "implement": [
+        "add",
+        "create",
+        "build",
+        "implement",
+        "new feature",
+        "write",
+        "make",
+        "generate",
+    ],
+    "refactor": [
+        "refactor",
+        "clean up",
+        "restructure",
+        "reorganize",
+        "rename",
+        "extract",
+        "simplify",
+        "move",
+    ],
+    "research": [
+        "how does",
+        "what is",
+        "explain",
+        "understand",
+        "look at",
+        "find",
+        "search",
+        "where is",
+        "show me",
+    ],
+    "brainstorm": [
+        "idea",
+        "think about",
+        "consider",
+        "brainstorm",
+        "design",
+        "plan",
+        "approach",
+        "strategy",
+        "option",
+    ],
+    "review": [
+        "review",
+        "check",
+        "audit",
+        "look over",
+        "examine",
+        "inspect",
+        "pr",
+        "pull request",
+    ],
+    "prototype": [
+        "prototype",
+        "proof of concept",
+        "poc",
+        "experiment",
+        "try",
+        "test",
+        "spike",
+        "explore",
+    ],
 }
 
 # Decision markers
 DECISION_MARKERS = [
-    "let's go with", "i'll use", "decided to", "going with", "chosen",
-    "the approach", "final", "commit", "ship", "merge", "lgtm",
-    "looks good", "that works", "perfect", "done", "complete",
+    "let's go with",
+    "i'll use",
+    "decided to",
+    "going with",
+    "chosen",
+    "the approach",
+    "final",
+    "commit",
+    "ship",
+    "merge",
+    "lgtm",
+    "looks good",
+    "that works",
+    "perfect",
+    "done",
+    "complete",
 ]
 
 # Correction indicators
 CORRECTION_MARKERS = [
-    "actually", "wait", "no,", "sorry", "wrong", "instead",
-    "not that", "undo", "revert", "go back", "try again",
-    "that's not", "that didn't", "doesn't work", "not working",
+    "actually",
+    "wait",
+    "no,",
+    "sorry",
+    "wrong",
+    "instead",
+    "not that",
+    "undo",
+    "revert",
+    "go back",
+    "try again",
+    "that's not",
+    "that didn't",
+    "doesn't work",
+    "not working",
 ]
 
 # Rephrasing indicators
 REPHRASING_MARKERS = [
-    "i mean", "what i meant", "to clarify", "in other words",
-    "let me rephrase", "more specifically", "to be clear",
+    "i mean",
+    "what i meant",
+    "to clarify",
+    "in other words",
+    "let me rephrase",
+    "more specifically",
+    "to be clear",
 ]
 
 # Tool categories for analysis

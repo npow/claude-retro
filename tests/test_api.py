@@ -1,6 +1,5 @@
 """Tests for API endpoints — catches the data consistency bugs we've hit."""
 
-import json
 import pytest
 from claude_retro.server import app
 from claude_retro.sessions import build_sessions, build_tool_usage

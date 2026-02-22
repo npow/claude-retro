@@ -19,7 +19,9 @@ def _find_lock_holder() -> str:
     try:
         result = subprocess.run(
             ["lsof", str(DB_PATH)],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         for line in result.stdout.strip().splitlines()[1:]:  # skip header
             parts = line.split()
@@ -31,17 +33,15 @@ def _find_lock_holder() -> str:
 
 
 def get_conn() -> duckdb.DuckDBPyConnection:
-    if not hasattr(_local, 'conn'):
+    if not hasattr(_local, "conn"):
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         deadline = time.monotonic() + LOCK_TIMEOUT
-        last_err = None
         attempt = 0
         while True:
             try:
                 _local.conn = duckdb.connect(str(DB_PATH))
                 break
             except duckdb.IOException as e:
-                last_err = e
                 if time.monotonic() >= deadline:
                     holder = _find_lock_holder()
                     raise duckdb.IOException(
@@ -51,7 +51,9 @@ def get_conn() -> duckdb.DuckDBPyConnection:
                         f"Original error: {e}"
                     ) from None
                 attempt += 1
-                wait = min(1.0, 0.2 * attempt)  # backoff: 0.2, 0.4, 0.6, 0.8, 1.0, 1.0, ...
+                wait = min(
+                    1.0, 0.2 * attempt
+                )  # backoff: 0.2, 0.4, 0.6, 0.8, 1.0, 1.0, ...
                 print(
                     f"[db] Waiting for DuckDB lock ({_find_lock_holder()})... "
                     f"retry in {wait:.1f}s",

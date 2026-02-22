@@ -58,8 +58,7 @@ def classify_all_intents():
         }
         intent = classify_intent(first_prompt or "", tool_ratios)
         conn.execute(
-            "UPDATE sessions SET intent = ? WHERE session_id = ?",
-            [intent, session_id]
+            "UPDATE sessions SET intent = ? WHERE session_id = ?", [intent, session_id]
         )
 
     return len(rows)

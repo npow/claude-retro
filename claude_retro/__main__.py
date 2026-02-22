@@ -19,8 +19,12 @@ def main():
 
         print("Ingesting JSONL files...")
         stats = run_ingest()
-        print(f"  Files: {stats['total_files']} total, {stats['ingested_files']} ingested, {stats['skipped_files']} skipped")
-        print(f"  Entries: {stats['total_entries']} new, {stats['total_entries_in_db']} total in DB")
+        print(
+            f"  Files: {stats['total_files']} total, {stats['ingested_files']} ingested, {stats['skipped_files']} skipped"
+        )
+        print(
+            f"  Entries: {stats['total_entries']} new, {stats['total_entries_in_db']} total in DB"
+        )
         print(f"  Sessions found: {stats['total_sessions_found']}")
         print(f"  Projects: {stats['total_projects']}")
 
@@ -60,6 +64,7 @@ def main():
 
     elif command == "app":
         from .app import launch
+
         launch()
 
     elif command == "serve":
@@ -70,6 +75,7 @@ def main():
 
         # Check if DB is empty — worker will run pipeline immediately
         from .db import get_conn
+
         conn = get_conn()
         count = conn.execute("SELECT COUNT(*) FROM raw_entries").fetchone()[0]
         needs_ingest = count == 0
@@ -88,10 +94,12 @@ def main():
 
     elif command == "digest":
         from .digest import weekly_digest
+
         print(weekly_digest())
 
     elif command == "reset":
         from .config import DB_PATH
+
         if DB_PATH.exists():
             DB_PATH.unlink()
             print(f"Deleted {DB_PATH}")

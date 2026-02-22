@@ -51,6 +51,7 @@ def generate_actions():
 # Prescription generators (write to DB)
 # ---------------------------------------------------------------------------
 
+
 def _time_of_day_insight(conn) -> int:
     result = conn.execute("""
         SELECT
@@ -74,17 +75,20 @@ def _time_of_day_insight(conn) -> int:
         worst = result[-1]
         delta = best[1] - worst[1]
         if delta > 0.05:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO prescriptions (category, title, description, evidence, confidence)
                 VALUES (?, ?, ?, ?, ?)
-            """, [
-                "scheduling",
-                f"Your {best[0]} sessions converge {delta:.0%} better",
-                f"Schedule complex work in the {best[0]}. "
-                f"{best[0].title()} sessions converge at {best[1]:.0%} vs {worst[1]:.0%} for {worst[0]}.",
-                f"Based on {best[2]} {best[0]} vs {worst[2]} {worst[0]} sessions.",
-                min(0.9, 0.5 + delta),
-            ])
+            """,
+                [
+                    "scheduling",
+                    f"Your {best[0]} sessions converge {delta:.0%} better",
+                    f"Schedule complex work in the {best[0]}. "
+                    f"{best[0].title()} sessions converge at {best[1]:.0%} vs {worst[1]:.0%} for {worst[0]}.",
+                    f"Based on {best[2]} {best[0]} vs {worst[2]} {worst[0]} sessions.",
+                    min(0.9, 0.5 + delta),
+                ],
+            )
             return 1
     return 0
 
@@ -107,18 +111,21 @@ def _first_prompt_quality_insight(conn) -> int:
         has_conv = buckets["has_corrections"][0]
         delta = zero_conv - has_conv
         if delta > 0.08:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO prescriptions (category, title, description, evidence, confidence)
                 VALUES (?, ?, ?, ?, ?)
-            """, [
-                "prompt_quality",
-                "Zero-correction sessions vastly outperform",
-                f"Sessions with no corrections converge at {zero_conv:.0%} vs {has_conv:.0%}. "
-                f"Invest more time crafting your first prompt to avoid back-and-forth.",
-                f"Based on {buckets['zero_corrections'][1]} zero-correction vs "
-                f"{buckets['has_corrections'][1]} sessions with corrections.",
-                min(0.92, 0.5 + delta),
-            ])
+            """,
+                [
+                    "prompt_quality",
+                    "Zero-correction sessions vastly outperform",
+                    f"Sessions with no corrections converge at {zero_conv:.0%} vs {has_conv:.0%}. "
+                    f"Invest more time crafting your first prompt to avoid back-and-forth.",
+                    f"Based on {buckets['zero_corrections'][1]} zero-correction vs "
+                    f"{buckets['has_corrections'][1]} sessions with corrections.",
+                    min(0.92, 0.5 + delta),
+                ],
+            )
             return 1
     return 0
 
@@ -145,17 +152,20 @@ def _session_length_insight(conn) -> int:
         worst = result[-1]
         delta = best[1] - worst[1]
         if delta > 0.05:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO prescriptions (category, title, description, evidence, confidence)
                 VALUES (?, ?, ?, ?, ?)
-            """, [
-                "session_length",
-                f"{best[0]} sessions have highest convergence",
-                f"Sessions under 15 minutes converge at {best[1]:.0%} vs {worst[1]:.0%} for "
-                f"{worst[0]} sessions. Break complex work into smaller chunks.",
-                f"Based on {best[2]} {best[0]} vs {worst[2]} {worst[0]} sessions.",
-                min(0.85, 0.5 + delta),
-            ])
+            """,
+                [
+                    "session_length",
+                    f"{best[0]} sessions have highest convergence",
+                    f"Sessions under 15 minutes converge at {best[1]:.0%} vs {worst[1]:.0%} for "
+                    f"{worst[0]} sessions. Break complex work into smaller chunks.",
+                    f"Based on {best[2]} {best[0]} vs {worst[2]} {worst[0]} sessions.",
+                    min(0.85, 0.5 + delta),
+                ],
+            )
             return 1
     return 0
 
@@ -196,19 +206,24 @@ def _project_flags(conn) -> int:
             if thrash > avg_thrash * 1.5:
                 reasons.append(f"thrash {thrash:.0%} vs {avg_thrash:.0%} avg")
             if p_avg_errors > avg_errors * 1.5:
-                reasons.append(f"{total_errors:.0f} total errors ({p_avg_errors:.1f}/session vs {avg_errors:.1f} avg)")
+                reasons.append(
+                    f"{total_errors:.0f} total errors ({p_avg_errors:.1f}/session vs {avg_errors:.1f} avg)"
+                )
 
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO prescriptions (category, title, description, evidence, confidence)
                 VALUES (?, ?, ?, ?, ?)
-            """, [
-                "project_health",
-                f"Project '{short_name}' needs attention",
-                f"This project is struggling: {'; '.join(reasons)}. "
-                f"Convergence is at {conv:.0%}.",
-                f"Based on {n} sessions.",
-                0.8,
-            ])
+            """,
+                [
+                    "project_health",
+                    f"Project '{short_name}' needs attention",
+                    f"This project is struggling: {'; '.join(reasons)}. "
+                    f"Convergence is at {conv:.0%}.",
+                    f"Based on {n} sessions.",
+                    0.8,
+                ],
+            )
             count += 1
             if count >= 3:
                 break
@@ -251,18 +266,21 @@ def _trend_insight(conn) -> int:
     title = "Recent trend: " + ", ".join(parts)
     is_positive = conv_delta > 0.03 and thrash_delta <= 0.03
 
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO prescriptions (category, title, description, evidence, confidence)
         VALUES (?, ?, ?, ?, ?)
-    """, [
-        "trend",
-        title,
-        f"Last 20 sessions: convergence {r_conv:.0%} (was {p_conv:.0%}), "
-        f"thrash {r_thrash:.0%} (was {p_thrash:.0%}). "
-        + ("Keep it up!" if is_positive else "Watch the trend."),
-        "Comparing last 20 sessions vs previous 20.",
-        0.75,
-    ])
+    """,
+        [
+            "trend",
+            title,
+            f"Last 20 sessions: convergence {r_conv:.0%} (was {p_conv:.0%}), "
+            f"thrash {r_thrash:.0%} (was {p_thrash:.0%}). "
+            + ("Keep it up!" if is_positive else "Watch the trend."),
+            "Comparing last 20 sessions vs previous 20.",
+            0.75,
+        ],
+    )
     return 1
 
 
@@ -290,17 +308,20 @@ def _tool_error_hotspot(conn) -> int:
     ratio = tool_errors / total_errors
 
     if ratio > 0.4:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO prescriptions (category, title, description, evidence, confidence)
             VALUES (?, ?, ?, ?, ?)
-        """, [
-            "tool_errors",
-            f"'{tool_name}' accounts for {ratio:.0%} of all tool errors",
-            f"The {tool_name} tool generated {tool_errors} of {total_errors} total errors. "
-            f"Check if you're hitting a recurring issue with this tool.",
-            f"Based on all session tool usage data.",
-            min(0.85, 0.5 + ratio * 0.5),
-        ])
+        """,
+            [
+                "tool_errors",
+                f"'{tool_name}' accounts for {ratio:.0%} of all tool errors",
+                f"The {tool_name} tool generated {tool_errors} of {total_errors} total errors. "
+                f"Check if you're hitting a recurring issue with this tool.",
+                "Based on all session tool usage data.",
+                min(0.85, 0.5 + ratio * 0.5),
+            ],
+        )
         return 1
     return 0
 
@@ -308,6 +329,7 @@ def _tool_error_hotspot(conn) -> int:
 # ---------------------------------------------------------------------------
 # Action generators (return dicts, no DB writes)
 # ---------------------------------------------------------------------------
+
 
 def _action_time_of_day(conn):
     result = conn.execute("""
@@ -332,13 +354,15 @@ def _action_time_of_day(conn):
         worst = result[-1]
         delta = best[1] - worst[1]
         if delta > 0.05:
-            return [{
-                "type": "tip",
-                "title": f"Your {best[0]} sessions converge {delta:.0%} better",
-                "body": f"Schedule complex work in the {best[0]}. "
-                        f"{best[0].title()} convergence: {best[1]:.0%} vs {worst[0]}: {worst[1]:.0%}.",
-                "evidence": f"{best[2]} {best[0]} vs {worst[2]} {worst[0]} sessions",
-            }]
+            return [
+                {
+                    "type": "tip",
+                    "title": f"Your {best[0]} sessions converge {delta:.0%} better",
+                    "body": f"Schedule complex work in the {best[0]}. "
+                    f"{best[0].title()} convergence: {best[1]:.0%} vs {worst[0]}: {worst[1]:.0%}.",
+                    "evidence": f"{best[2]} {best[0]} vs {worst[2]} {worst[0]} sessions",
+                }
+            ]
     return []
 
 
@@ -360,13 +384,15 @@ def _action_first_prompt_quality(conn):
         has_conv = buckets["has"][0]
         delta = zero_conv - has_conv
         if delta > 0.08:
-            return [{
-                "type": "tip",
-                "title": "Invest in your first prompt",
-                "body": f"Sessions with zero corrections converge at {zero_conv:.0%} vs "
-                        f"{has_conv:.0%} with corrections. Spend more time upfront.",
-                "evidence": f"{buckets['zero'][1]} zero-correction vs {buckets['has'][1]} with corrections",
-            }]
+            return [
+                {
+                    "type": "tip",
+                    "title": "Invest in your first prompt",
+                    "body": f"Sessions with zero corrections converge at {zero_conv:.0%} vs "
+                    f"{has_conv:.0%} with corrections. Spend more time upfront.",
+                    "evidence": f"{buckets['zero'][1]} zero-correction vs {buckets['has'][1]} with corrections",
+                }
+            ]
     return []
 
 
@@ -392,13 +418,15 @@ def _action_session_length(conn):
         worst = result[-1]
         delta = best[1] - worst[1]
         if delta > 0.05:
-            return [{
-                "type": "tip",
-                "title": f"{best[0]} sessions converge best",
-                "body": f"Convergence: {best[1]:.0%} for {best[0]} vs {worst[1]:.0%} for {worst[0]}. "
-                        f"Break work into smaller chunks.",
-                "evidence": f"{best[2]} vs {worst[2]} sessions",
-            }]
+            return [
+                {
+                    "type": "tip",
+                    "title": f"{best[0]} sessions converge best",
+                    "body": f"Convergence: {best[1]:.0%} for {best[0]} vs {worst[1]:.0%} for {worst[0]}. "
+                    f"Break work into smaller chunks.",
+                    "evidence": f"{best[2]} vs {worst[2]} sessions",
+                }
+            ]
     return []
 
 
@@ -435,13 +463,15 @@ def _action_project_flags(conn):
                 reasons.append(f"thrash {thrash:.0%}")
             if p_avg_errors > avg_errors * 1.5:
                 reasons.append(f"{total_errors:.0f} errors")
-            actions.append({
-                "type": "warning",
-                "title": f"Project '{short}' struggling",
-                "body": f"Convergence {conv:.0%}, {', '.join(reasons)}. "
-                        f"Consider reviewing your approach for this project.",
-                "evidence": f"{n} sessions, avg thrash {avg_thrash:.0%}",
-            })
+            actions.append(
+                {
+                    "type": "warning",
+                    "title": f"Project '{short}' struggling",
+                    "body": f"Convergence {conv:.0%}, {', '.join(reasons)}. "
+                    f"Consider reviewing your approach for this project.",
+                    "evidence": f"{n} sessions, avg thrash {avg_thrash:.0%}",
+                }
+            )
             if len(actions) >= 2:
                 break
     return actions
@@ -469,9 +499,13 @@ def _action_trend(conn):
 
     parts = []
     if abs(conv_delta) > 0.03:
-        parts.append(f"Convergence {'up' if conv_delta > 0 else 'down'} {abs(conv_delta):.0%}")
+        parts.append(
+            f"Convergence {'up' if conv_delta > 0 else 'down'} {abs(conv_delta):.0%}"
+        )
     if abs(thrash_delta) > 0.03:
-        parts.append(f"thrash {'up' if thrash_delta > 0 else 'down'} {abs(thrash_delta):.0%}")
+        parts.append(
+            f"thrash {'up' if thrash_delta > 0 else 'down'} {abs(thrash_delta):.0%}"
+        )
 
     if not parts:
         return []
@@ -479,13 +513,15 @@ def _action_trend(conn):
     is_good = conv_delta > 0.03 and thrash_delta <= 0.03
     is_bad = conv_delta < -0.03 or thrash_delta > 0.05
 
-    return [{
-        "type": "positive" if is_good else ("warning" if is_bad else "tip"),
-        "title": ", ".join(parts) + " over last 20 sessions",
-        "body": f"Recent: convergence {r_conv:.0%}, thrash {r_thrash:.0%}. "
-                f"Previous 20: convergence {p_conv:.0%}, thrash {p_thrash:.0%}.",
-        "evidence": "Comparing last 20 vs previous 20 sessions",
-    }]
+    return [
+        {
+            "type": "positive" if is_good else ("warning" if is_bad else "tip"),
+            "title": ", ".join(parts) + " over last 20 sessions",
+            "body": f"Recent: convergence {r_conv:.0%}, thrash {r_thrash:.0%}. "
+            f"Previous 20: convergence {p_conv:.0%}, thrash {p_thrash:.0%}.",
+            "evidence": "Comparing last 20 vs previous 20 sessions",
+        }
+    ]
 
 
 def _action_tool_error_hotspot(conn):
@@ -510,19 +546,22 @@ def _action_tool_error_hotspot(conn):
     ratio = tool_errors / total_errors
 
     if ratio > 0.4:
-        return [{
-            "type": "warning",
-            "title": f"'{tool_name}' causes {ratio:.0%} of tool errors",
-            "body": f"{tool_errors} of {total_errors} total errors come from {tool_name}. "
-                    f"Check for a recurring issue.",
-            "evidence": f"Across all sessions",
-        }]
+        return [
+            {
+                "type": "warning",
+                "title": f"'{tool_name}' causes {ratio:.0%} of tool errors",
+                "body": f"{tool_errors} of {total_errors} total errors come from {tool_name}. "
+                f"Check for a recurring issue.",
+                "evidence": "Across all sessions",
+            }
+        ]
     return []
 
 
 # ---------------------------------------------------------------------------
 # Judgment-based prescription generators (write to DB)
 # ---------------------------------------------------------------------------
+
 
 def _judgment_prompt_quality_insight(conn) -> int:
     """Flag low prompt clarity based on LLM judgments."""
@@ -535,18 +574,21 @@ def _judgment_prompt_quality_insight(conn) -> int:
 
     avg_clarity, avg_completeness, n = result
     if avg_clarity < 0.6:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO prescriptions (category, title, description, evidence, confidence)
             VALUES (?, ?, ?, ?, ?)
-        """, [
-            "prompt_quality",
-            f"AI analysis: prompt clarity averaging {avg_clarity:.0%}",
-            f"LLM analysis of your sessions finds average prompt clarity at {avg_clarity:.0%} "
-            f"and completeness at {avg_completeness:.0%}. Consider including more context, "
-            f"specific requirements, and expected outcomes in your initial prompts.",
-            f"Based on AI analysis of {n} sessions.",
-            min(0.85, 0.5 + (0.6 - avg_clarity)),
-        ])
+        """,
+            [
+                "prompt_quality",
+                f"AI analysis: prompt clarity averaging {avg_clarity:.0%}",
+                f"LLM analysis of your sessions finds average prompt clarity at {avg_clarity:.0%} "
+                f"and completeness at {avg_completeness:.0%}. Consider including more context, "
+                f"specific requirements, and expected outcomes in your initial prompts.",
+                f"Based on AI analysis of {n} sessions.",
+                min(0.85, 0.5 + (0.6 - avg_clarity)),
+            ],
+        )
         return 1
     return 0
 
@@ -567,19 +609,24 @@ def _judgment_misalignment_insight(conn) -> int:
     for project_name, n, misaligned in results:
         rate = misaligned / n
         if rate > 0.3:
-            short = project_name.replace("-Users-npow-code-", "").replace("-Users-npow-", "")
-            conn.execute("""
+            short = project_name.replace("-Users-npow-code-", "").replace(
+                "-Users-npow-", ""
+            )
+            conn.execute(
+                """
                 INSERT INTO prescriptions (category, title, description, evidence, confidence)
                 VALUES (?, ?, ?, ?, ?)
-            """, [
-                "project_health",
-                f"AI analysis: '{short}' has {rate:.0%} misalignment rate",
-                f"LLM analysis found that {misaligned} of {n} sessions in '{short}' "
-                f"had misalignments where Claude went off-track and needed correction. "
-                f"Consider writing more detailed prompts for this project.",
-                f"Based on AI analysis of {n} sessions.",
-                min(0.85, 0.5 + rate * 0.5),
-            ])
+            """,
+                [
+                    "project_health",
+                    f"AI analysis: '{short}' has {rate:.0%} misalignment rate",
+                    f"LLM analysis found that {misaligned} of {n} sessions in '{short}' "
+                    f"had misalignments where Claude went off-track and needed correction. "
+                    f"Consider writing more detailed prompts for this project.",
+                    f"Based on AI analysis of {n} sessions.",
+                    min(0.85, 0.5 + rate * 0.5),
+                ],
+            )
             count += 1
             if count >= 2:
                 break
@@ -600,7 +647,9 @@ def _judgment_underspec_patterns(conn) -> int:
     aspect_counts = {}
     for (parts_json,) in rows:
         try:
-            parts = json.loads(parts_json) if isinstance(parts_json, str) else parts_json
+            parts = (
+                json.loads(parts_json) if isinstance(parts_json, str) else parts_json
+            )
             for p in parts:
                 aspect = p.get("aspect", str(p)) if isinstance(p, dict) else str(p)
                 # Normalize
@@ -623,23 +672,27 @@ def _judgment_underspec_patterns(conn) -> int:
     top = recurring[:3]
     aspects_str = ", ".join(f"'{a}' ({c}x)" for a, c in top)
 
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO prescriptions (category, title, description, evidence, confidence)
         VALUES (?, ?, ?, ?, ?)
-    """, [
-        "prompt_quality",
-        "AI analysis: recurring underspecification patterns",
-        f"LLM analysis found these aspects are frequently underspecified in your prompts: "
-        f"{aspects_str}. Including these details upfront could reduce back-and-forth.",
-        f"Based on analysis of {len(rows)} sessions with underspecified elements.",
-        0.75,
-    ])
+    """,
+        [
+            "prompt_quality",
+            "AI analysis: recurring underspecification patterns",
+            f"LLM analysis found these aspects are frequently underspecified in your prompts: "
+            f"{aspects_str}. Including these details upfront could reduce back-and-forth.",
+            f"Based on analysis of {len(rows)} sessions with underspecified elements.",
+            0.75,
+        ],
+    )
     return 1
 
 
 # ---------------------------------------------------------------------------
 # Judgment-based action generators (return dicts, no DB writes)
 # ---------------------------------------------------------------------------
+
 
 def _action_judgment_prompt_quality(conn):
     result = conn.execute("""
@@ -651,13 +704,15 @@ def _action_judgment_prompt_quality(conn):
 
     avg_clarity, avg_completeness, n = result
     if avg_clarity < 0.6:
-        return [{
-            "type": "tip",
-            "title": f"AI analysis: prompt clarity at {avg_clarity:.0%}",
-            "body": f"Across {n} sessions, your prompts average {avg_clarity:.0%} clarity "
-                    f"and {avg_completeness:.0%} completeness. Be more specific upfront.",
-            "evidence": f"AI analysis of {n} sessions",
-        }]
+        return [
+            {
+                "type": "tip",
+                "title": f"AI analysis: prompt clarity at {avg_clarity:.0%}",
+                "body": f"Across {n} sessions, your prompts average {avg_clarity:.0%} clarity "
+                f"and {avg_completeness:.0%} completeness. Be more specific upfront.",
+                "evidence": f"AI analysis of {n} sessions",
+            }
+        ]
     return []
 
 
@@ -673,13 +728,15 @@ def _action_judgment_misalignment(conn):
     total, misaligned = result
     rate = misaligned / total
     if rate > 0.3:
-        return [{
-            "type": "warning",
-            "title": f"AI analysis: {rate:.0%} of sessions have misalignments",
-            "body": f"{misaligned} of {total} analyzed sessions had points where Claude "
-                    f"went off-track. Review the AI Analysis in session details for specifics.",
-            "evidence": f"AI analysis of {total} sessions",
-        }]
+        return [
+            {
+                "type": "warning",
+                "title": f"AI analysis: {rate:.0%} of sessions have misalignments",
+                "body": f"{misaligned} of {total} analyzed sessions had points where Claude "
+                f"went off-track. Review the AI Analysis in session details for specifics.",
+                "evidence": f"AI analysis of {total} sessions",
+            }
+        ]
     return []
 
 
@@ -695,7 +752,9 @@ def _action_judgment_underspec_patterns(conn):
     aspect_counts = {}
     for (parts_json,) in rows:
         try:
-            parts = json.loads(parts_json) if isinstance(parts_json, str) else parts_json
+            parts = (
+                json.loads(parts_json) if isinstance(parts_json, str) else parts_json
+            )
             for p in parts:
                 aspect = p.get("aspect", str(p)) if isinstance(p, dict) else str(p)
                 aspect_lower = aspect.lower().strip()
@@ -711,18 +770,21 @@ def _action_judgment_underspec_patterns(conn):
         return []
 
     top = recurring[:3]
-    return [{
-        "type": "tip",
-        "title": "AI analysis: recurring gaps in prompts",
-        "body": f"Frequently underspecified: {', '.join(a for a, _ in top)}. "
-                f"Including these details upfront could save turns.",
-        "evidence": f"Pattern found in {len(rows)} sessions",
-    }]
+    return [
+        {
+            "type": "tip",
+            "title": "AI analysis: recurring gaps in prompts",
+            "body": f"Frequently underspecified: {', '.join(a for a, _ in top)}. "
+            f"Including these details upfront could save turns.",
+            "evidence": f"Pattern found in {len(rows)} sessions",
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Behavioral correlation action generators (connect behaviors to AI outcomes)
 # ---------------------------------------------------------------------------
+
 
 def _action_prompt_length_correlation(conn):
     """Bin sessions by first-prompt length, compare avg productivity per bin."""
@@ -751,13 +813,15 @@ def _action_prompt_length_correlation(conn):
     if abs(delta) < 0.05:
         return []
 
-    return [{
-        "type": "tip",
-        "title": f"Prompt length matters: {best[0]} prompts are most productive",
-        "body": f"Sessions with prompts {best[0]} had {best[1]:.0%} productivity vs "
-                f"{worst[1]:.0%} for {worst[0]}.",
-        "evidence": f"Based on {sum(r[2] for r in rows)} AI-judged sessions",
-    }]
+    return [
+        {
+            "type": "tip",
+            "title": f"Prompt length matters: {best[0]} prompts are most productive",
+            "body": f"Sessions with prompts {best[0]} had {best[1]:.0%} productivity vs "
+            f"{worst[1]:.0%} for {worst[0]}.",
+            "evidence": f"Based on {sum(r[2] for r in rows)} AI-judged sessions",
+        }
+    ]
 
 
 def _action_correction_impact(conn):
@@ -784,13 +848,15 @@ def _action_correction_impact(conn):
     if abs(zero_comp - has_comp) < 5:
         return []
 
-    return [{
-        "type": "tip",
-        "title": "Corrections correlate with lower completion",
-        "body": f"Sessions with zero corrections completed {zero_comp:.0f}% of the time "
-                f"vs {has_comp:.0f}% with corrections. Productivity: {zero_prod:.0%} vs {has_prod:.0%}.",
-        "evidence": f"{zero_n} zero-correction vs {has_n} with-correction sessions",
-    }]
+    return [
+        {
+            "type": "tip",
+            "title": "Corrections correlate with lower completion",
+            "body": f"Sessions with zero corrections completed {zero_comp:.0f}% of the time "
+            f"vs {has_comp:.0f}% with corrections. Productivity: {zero_prod:.0%} vs {has_prod:.0%}.",
+            "evidence": f"{zero_n} zero-correction vs {has_n} with-correction sessions",
+        }
+    ]
 
 
 def _action_tool_focus(conn):
@@ -822,9 +888,11 @@ def _action_tool_focus(conn):
     hi = max(f_prod, b_prod)
     lo = min(f_prod, b_prod)
 
-    return [{
-        "type": "tip",
-        "title": f"Tool focus: {better} sessions are more productive",
-        "body": f"Sessions using {better} had {hi:.0%} productivity vs {lo:.0%} for {worse}.",
-        "evidence": f"{f_n} focused vs {b_n} broad sessions",
-    }]
+    return [
+        {
+            "type": "tip",
+            "title": f"Tool focus: {better} sessions are more productive",
+            "body": f"Sessions using {better} had {hi:.0%} productivity vs {lo:.0%} for {worse}.",
+            "evidence": f"{f_n} focused vs {b_n} broad sessions",
+        }
+    ]

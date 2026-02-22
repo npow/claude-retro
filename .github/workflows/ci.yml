@@ -25,9 +25,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e .
-      - run: python -c "from claude_retro.db import get_conn; print('imports ok')"
-      - run: python -m claude_retro help || true
+      - run: pip install -e . && pip install pytest
+      - run: python -m pytest tests/ -v
 
   build-macos:
     runs-on: macos-latest

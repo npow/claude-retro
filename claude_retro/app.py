@@ -19,6 +19,7 @@ def _find_free_port() -> int:
 def _needs_initial_ingest() -> bool:
     """Check if the DB has no sessions yet."""
     from .db import get_conn
+
     conn = get_conn()
     count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
     return count == 0
@@ -33,7 +34,9 @@ def launch():
 
     # Start Flask in a daemon thread
     server = make_server("127.0.0.1", port, flask_app)
-    flask_thread = threading.Thread(target=server.serve_forever, daemon=True, name="flask-server")
+    flask_thread = threading.Thread(
+        target=server.serve_forever, daemon=True, name="flask-server"
+    )
     flask_thread.start()
 
     # Start background ingestion worker — run pipeline immediately if DB is empty
@@ -42,7 +45,7 @@ def launch():
     worker.start()
 
     # Create and run the native window (blocks until closed)
-    window = webview.create_window("Claude Retro", url, width=1280, height=860)
+    webview.create_window("Claude Retro", url, width=1280, height=860)
     webview.start()
 
     # Cleanup

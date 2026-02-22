@@ -90,9 +90,13 @@ def weekly_digest() -> str:
     lines.append(f"\n  {period} Summary")
     lines.append(f"  {'-' * 40}")
     lines.append(f"  Sessions:        {total_sess}  ({total_hours:.1f}h)")
-    lines.append(f"  Outcomes:        {completed} completed, {partial} partial, {failed} failed, {abandoned} abandoned")
+    lines.append(
+        f"  Outcomes:        {completed} completed, {partial} partial, {failed} failed, {abandoned} abandoned"
+    )
     lines.append(f"  Completion Rate: {completion_rate:.0%}")
-    lines.append(f"  Avg Productivity:{avg_prod:.0%}" if avg_prod else "  Avg Productivity: N/A")
+    lines.append(
+        f"  Avg Productivity:{avg_prod:.0%}" if avg_prod else "  Avg Productivity: N/A"
+    )
     lines.append(f"  Avg Misalign:    {avg_misalign:.1f} per session")
 
     # --- Week-over-week comparison ---
@@ -109,27 +113,60 @@ def weekly_digest() -> str:
         comp_delta = completion_rate - lw_comp_rate
         mis_delta = (avg_misalign or 0) - lw_misalign
 
-        arrow = lambda d: "+" if d > 0 else ""
-        lines.append(f"  Productivity:    {arrow(prod_delta)}{prod_delta:.0%} ({lw_prod:.0%} -> {avg_prod:.0%})")
-        lines.append(f"  Completion Rate: {arrow(comp_delta)}{comp_delta:.0%} ({lw_comp_rate:.0%} -> {completion_rate:.0%})")
+        def arrow(d):
+            return "+" if d > 0 else ""
+
+        lines.append(
+            f"  Productivity:    {arrow(prod_delta)}{prod_delta:.0%} ({lw_prod:.0%} -> {avg_prod:.0%})"
+        )
+        lines.append(
+            f"  Completion Rate: {arrow(comp_delta)}{comp_delta:.0%} ({lw_comp_rate:.0%} -> {completion_rate:.0%})"
+        )
         trend = "fewer" if mis_delta < 0 else "more"
-        lines.append(f"  Misalignments:   {arrow(mis_delta)}{mis_delta:.1f}/session ({trend})")
+        lines.append(
+            f"  Misalignments:   {arrow(mis_delta)}{mis_delta:.1f}/session ({trend})"
+        )
 
     # --- Top prompt gaps this week ---
-    time_filter = "WHERE s.started_at >= current_date - INTERVAL '7 days'" if not use_alltime else ""
-    join_clause = "JOIN sessions s ON j.session_id = s.session_id" if not use_alltime else ""
-    gap_rows = conn.execute(f"""
+    time_filter = (
+        "WHERE s.started_at >= current_date - INTERVAL '7 days'"
+        if not use_alltime
+        else ""
+    )
+    join_clause = (
+        "JOIN sessions s ON j.session_id = s.session_id" if not use_alltime else ""
+    )
+    gap_rows = conn.execute(
+        f"""
         SELECT j.prompt_missing FROM session_judgments j
         {join_clause}
         {time_filter}
-    """.replace("WHERE s.", "WHERE s.") if not use_alltime else """
+    """.replace("WHERE s.", "WHERE s.")
+        if not use_alltime
+        else """
         SELECT prompt_missing FROM session_judgments
         WHERE prompt_missing IS NOT NULL AND prompt_missing != '[]'
-    """).fetchall()
+    """
+    ).fetchall()
 
     gap_categories = {
-        "context": ["repo", "codebase", "file", "directory", "structure", "existing", "path"],
-        "requirements": ["expected", "behavior", "output", "format", "specific", "requirement"],
+        "context": [
+            "repo",
+            "codebase",
+            "file",
+            "directory",
+            "structure",
+            "existing",
+            "path",
+        ],
+        "requirements": [
+            "expected",
+            "behavior",
+            "output",
+            "format",
+            "specific",
+            "requirement",
+        ],
         "constraints": ["environment", "version", "dependency", "platform", "setup"],
         "error_details": ["error", "message", "stack", "trace", "log", "exception"],
         "scope": ["which", "where", "boundary", "limit", "priority"],
@@ -149,9 +186,11 @@ def weekly_digest() -> str:
         except (json.JSONDecodeError, TypeError):
             continue
 
-    top_gaps = sorted([(c, n) for c, n in cat_counts.items() if n > 0], key=lambda x: -x[1])[:3]
+    top_gaps = sorted(
+        [(c, n) for c, n in cat_counts.items() if n > 0], key=lambda x: -x[1]
+    )[:3]
     if top_gaps:
-        lines.append(f"\n  Top Prompt Gaps")
+        lines.append("\n  Top Prompt Gaps")
         lines.append(f"  {'-' * 40}")
         for cat, count in top_gaps:
             lines.append(f"    {cat:20s} {count:3d} occurrences")
@@ -168,7 +207,7 @@ def weekly_digest() -> str:
     worst_query += " ORDER BY j.misalignment_count DESC LIMIT 1"
     worst = conn.execute(worst_query).fetchone()
     if worst and worst[1] > 0:
-        lines.append(f"\n  Worst Session")
+        lines.append("\n  Worst Session")
         lines.append(f"  {'-' * 40}")
         lines.append(f"    {worst[1]} misalignments | outcome: {worst[2]}")
         lines.append(f"    Prompt: {worst[3]}...")
@@ -181,13 +220,13 @@ def weekly_digest() -> str:
         ORDER BY confidence DESC LIMIT 5
     """).fetchall()
     if prescriptions:
-        lines.append(f"\n  Active Insights")
+        lines.append("\n  Active Insights")
         lines.append(f"  {'-' * 40}")
         for title, conf in prescriptions:
             lines.append(f"    [{conf:.0%}] {title}")
 
     # --- Top projects ---
-    lines.append(f"\n  Top Projects (by sessions)")
+    lines.append("\n  Top Projects (by sessions)")
     lines.append(f"  {'-' * 40}")
     projects = conn.execute("""
         SELECT s.project_name, COUNT(*) as n,

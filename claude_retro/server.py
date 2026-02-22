@@ -1,7 +1,6 @@
 """Flask REST API."""
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -9,10 +8,10 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from .db import get_conn
 
-if getattr(sys, 'frozen', False):
-    _static = str(Path(sys._MEIPASS) / 'static')
+if getattr(sys, "frozen", False):
+    _static = str(Path(sys._MEIPASS) / "static")
 else:
-    _static = str(Path(__file__).parent / 'static')
+    _static = str(Path(__file__).parent / "static")
 
 app = Flask(__name__, static_folder=_static)
 
@@ -75,17 +74,19 @@ def api_overview():
     """).fetchall()
     baseline_cols = [d[0] for d in conn.description]
 
-    return jsonify({
-        "total_sessions": stats[0],
-        "avg_convergence": round(stats[1] or 0, 3),
-        "avg_drift": round(stats[2] or 0, 3),
-        "avg_thrash": round(stats[3] or 0, 3),
-        "total_hours": round(stats[4] or 0, 1),
-        "total_projects": stats[5],
-        "avg_turns": round(stats[6] or 0, 1),
-        "trajectory_distribution": {t: c for t, c in trajectory_dist},
-        "baselines": [_row_to_dict(b, baseline_cols) for b in baselines],
-    })
+    return jsonify(
+        {
+            "total_sessions": stats[0],
+            "avg_convergence": round(stats[1] or 0, 3),
+            "avg_drift": round(stats[2] or 0, 3),
+            "avg_thrash": round(stats[3] or 0, 3),
+            "total_hours": round(stats[4] or 0, 1),
+            "total_projects": stats[5],
+            "avg_turns": round(stats[6] or 0, 1),
+            "trajectory_distribution": {t: c for t, c in trajectory_dist},
+            "baselines": [_row_to_dict(b, baseline_cols) for b in baselines],
+        }
+    )
 
 
 @app.route("/api/sessions")
@@ -112,7 +113,9 @@ def api_sessions():
     }
     sort_parts = sort.split()
     sort_col = allowed_sorts.get(sort_parts[0], "s.started_at")
-    sort_dir = "DESC" if len(sort_parts) < 2 or sort_parts[1].upper() == "DESC" else "ASC"
+    sort_dir = (
+        "DESC" if len(sort_parts) < 2 or sort_parts[1].upper() == "DESC" else "ASC"
+    )
 
     conditions = []
     params = []
@@ -132,9 +135,12 @@ def api_sessions():
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
-    total = conn.execute(f"SELECT COUNT(*) FROM sessions s {where}", params).fetchone()[0]
+    total = conn.execute(f"SELECT COUNT(*) FROM sessions s {where}", params).fetchone()[
+        0
+    ]
 
-    rows = conn.execute(f"""
+    rows = conn.execute(
+        f"""
         SELECT s.session_id, s.project_name, s.started_at, s.ended_at, s.duration_seconds,
                s.user_prompt_count, s.assistant_msg_count, s.tool_use_count, s.tool_error_count,
                s.turn_count, s.first_prompt, s.intent, s.trajectory,
@@ -145,59 +151,98 @@ def api_sessions():
         {where}
         ORDER BY {sort_col} {sort_dir}
         LIMIT ? OFFSET ?
-    """, params + [limit, offset]).fetchall()
+    """,
+        params + [limit, offset],
+    ).fetchall()
 
-    cols = ["session_id", "project_name", "started_at", "ended_at", "duration_seconds",
-            "user_prompt_count", "assistant_msg_count", "tool_use_count", "tool_error_count",
-            "turn_count", "first_prompt", "intent", "trajectory",
-            "convergence_score", "drift_score", "thrash_score",
-            "judgment_outcome", "misalignment_count", "productivity_ratio"]
+    cols = [
+        "session_id",
+        "project_name",
+        "started_at",
+        "ended_at",
+        "duration_seconds",
+        "user_prompt_count",
+        "assistant_msg_count",
+        "tool_use_count",
+        "tool_error_count",
+        "turn_count",
+        "first_prompt",
+        "intent",
+        "trajectory",
+        "convergence_score",
+        "drift_score",
+        "thrash_score",
+        "judgment_outcome",
+        "misalignment_count",
+        "productivity_ratio",
+    ]
 
-    return jsonify({
-        "total": total,
-        "sessions": [_row_to_dict(r, cols) for r in rows],
-    })
+    return jsonify(
+        {
+            "total": total,
+            "sessions": [_row_to_dict(r, cols) for r in rows],
+        }
+    )
 
 
 @app.route("/api/sessions/<session_id>")
 def api_session_detail(session_id):
     conn = get_conn()
 
-    session = conn.execute("""
+    session = conn.execute(
+        """
         SELECT * FROM sessions WHERE session_id = ?
-    """, [session_id]).fetchone()
+    """,
+        [session_id],
+    ).fetchone()
 
     if not session:
         return jsonify({"error": "Session not found"}), 404
 
     session_cols = [d[0] for d in conn.description]
 
-    features = conn.execute("""
+    features = conn.execute(
+        """
         SELECT * FROM session_features WHERE session_id = ?
-    """, [session_id]).fetchone()
+    """,
+        [session_id],
+    ).fetchone()
     feature_cols = [d[0] for d in conn.description] if features else []
 
-    tools = conn.execute("""
+    tools = conn.execute(
+        """
         SELECT tool_name, use_count, error_count
         FROM session_tool_usage WHERE session_id = ?
         ORDER BY use_count DESC
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
-    judgment = conn.execute("""
+    judgment = conn.execute(
+        """
         SELECT * FROM session_judgments WHERE session_id = ?
-    """, [session_id]).fetchone()
+    """,
+        [session_id],
+    ).fetchone()
     judgment_cols = [d[0] for d in conn.description] if judgment else []
 
     result = {
         "session": _row_to_dict(session, session_cols),
         "features": _row_to_dict(features, feature_cols) if features else {},
-        "tools": [{"tool_name": t[0], "use_count": t[1], "error_count": t[2]} for t in tools],
+        "tools": [
+            {"tool_name": t[0], "use_count": t[1], "error_count": t[2]} for t in tools
+        ],
     }
     if judgment:
         jd = _row_to_dict(judgment, judgment_cols)
         # Parse JSON string fields for the frontend
-        for field in ("prompt_missing", "underspecified_parts", "misalignments",
-                      "corrections", "waste_breakdown"):
+        for field in (
+            "prompt_missing",
+            "underspecified_parts",
+            "misalignments",
+            "corrections",
+            "waste_breakdown",
+        ):
             if jd.get(field) and isinstance(jd[field], str):
                 try:
                     jd[field] = json.loads(jd[field])
@@ -214,7 +259,8 @@ def api_session_detail(session_id):
 def api_session_timeline(session_id):
     conn = get_conn()
 
-    entries = conn.execute("""
+    entries = conn.execute(
+        """
         SELECT entry_id, entry_type, timestamp_utc, user_text_length,
                text_length, tool_names, is_tool_result, tool_result_error,
                system_subtype, duration_ms,
@@ -222,15 +268,29 @@ def api_session_timeline(session_id):
         FROM raw_entries
         WHERE session_id = ? AND NOT is_sidechain
         ORDER BY timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
-    cols = ["entry_id", "entry_type", "timestamp_utc", "user_text_length",
-            "text_length", "tool_names", "is_tool_result", "tool_result_error",
-            "system_subtype", "duration_ms", "preview"]
+    cols = [
+        "entry_id",
+        "entry_type",
+        "timestamp_utc",
+        "user_text_length",
+        "text_length",
+        "tool_names",
+        "is_tool_result",
+        "tool_result_error",
+        "system_subtype",
+        "duration_ms",
+        "preview",
+    ]
 
-    return jsonify({
-        "timeline": [_row_to_dict(e, cols) for e in entries],
-    })
+    return jsonify(
+        {
+            "timeline": [_row_to_dict(e, cols) for e in entries],
+        }
+    )
 
 
 @app.route("/api/intents")
@@ -251,12 +311,21 @@ def api_intents():
         ORDER BY count DESC
     """).fetchall()
 
-    cols = ["intent", "count", "avg_convergence", "avg_drift", "avg_thrash",
-            "avg_duration", "avg_turns"]
+    cols = [
+        "intent",
+        "count",
+        "avg_convergence",
+        "avg_drift",
+        "avg_thrash",
+        "avg_duration",
+        "avg_turns",
+    ]
 
-    return jsonify({
-        "intents": [_row_to_dict(r, cols) for r in rows],
-    })
+    return jsonify(
+        {
+            "intents": [_row_to_dict(r, cols) for r in rows],
+        }
+    )
 
 
 @app.route("/api/trends")
@@ -264,7 +333,8 @@ def api_trends():
     conn = get_conn()
     days = int(request.args.get("days", 30))
 
-    rows = conn.execute("""
+    rows = conn.execute(
+        """
         SELECT
             CAST(started_at AS DATE) as day,
             COUNT(*) as sessions,
@@ -276,18 +346,22 @@ def api_trends():
         WHERE started_at >= current_date - INTERVAL '? days'
         GROUP BY CAST(started_at AS DATE)
         ORDER BY day
-    """.replace("?", str(int(days)))).fetchall()
+    """.replace("?", str(int(days)))
+    ).fetchall()
 
     cols = ["day", "sessions", "avg_convergence", "avg_drift", "avg_thrash", "hours"]
 
-    return jsonify({
-        "trends": [_row_to_dict(r, cols) for r in rows],
-    })
+    return jsonify(
+        {
+            "trends": [_row_to_dict(r, cols) for r in rows],
+        }
+    )
 
 
 @app.route("/api/actions")
 def api_actions():
     from .prescriptions import generate_actions
+
     actions = generate_actions()
     return jsonify({"actions": actions})
 
@@ -303,11 +377,22 @@ def api_prescriptions():
         ORDER BY confidence DESC
     """).fetchall()
 
-    cols = ["id", "category", "title", "description", "evidence", "confidence", "dismissed", "created_at"]
+    cols = [
+        "id",
+        "category",
+        "title",
+        "description",
+        "evidence",
+        "confidence",
+        "dismissed",
+        "created_at",
+    ]
 
-    return jsonify({
-        "prescriptions": [_row_to_dict(r, cols) for r in rows],
-    })
+    return jsonify(
+        {
+            "prescriptions": [_row_to_dict(r, cols) for r in rows],
+        }
+    )
 
 
 @app.route("/api/prescriptions/<int:pid>/dismiss", methods=["POST"])
@@ -328,9 +413,14 @@ def api_tools():
         ORDER BY total_uses DESC
     """).fetchall()
 
-    return jsonify({
-        "tools": [{"tool_name": r[0], "total_uses": r[1], "total_errors": r[2]} for r in rows],
-    })
+    return jsonify(
+        {
+            "tools": [
+                {"tool_name": r[0], "total_uses": r[1], "total_errors": r[2]}
+                for r in rows
+            ],
+        }
+    )
 
 
 @app.route("/api/projects")
@@ -360,14 +450,27 @@ def api_projects():
         ORDER BY session_count DESC
     """).fetchall()
 
-    cols = ["project_name", "session_count", "avg_convergence", "avg_drift",
-            "avg_thrash", "total_hours", "last_active", "total_errors",
-            "total_input_tokens", "total_output_tokens",
-            "avg_productivity", "completion_rate", "avg_misalignments"]
+    cols = [
+        "project_name",
+        "session_count",
+        "avg_convergence",
+        "avg_drift",
+        "avg_thrash",
+        "total_hours",
+        "last_active",
+        "total_errors",
+        "total_input_tokens",
+        "total_output_tokens",
+        "avg_productivity",
+        "completion_rate",
+        "avg_misalignments",
+    ]
 
-    return jsonify({
-        "projects": [_row_to_dict(r, cols) for r in rows],
-    })
+    return jsonify(
+        {
+            "projects": [_row_to_dict(r, cols) for r in rows],
+        }
+    )
 
 
 @app.route("/api/refresh", methods=["POST"])
@@ -382,7 +485,15 @@ def api_refresh():
 
     if _worker.is_busy:
         # Queue it — the worker will pick it up after the current run finishes
-        _worker.request_refresh(concurrency=max(1, min(32, int((request.get_json(silent=True) or {}).get("concurrency", 12)))))
+        _worker.request_refresh(
+            concurrency=max(
+                1,
+                min(
+                    32,
+                    int((request.get_json(silent=True) or {}).get("concurrency", 12)),
+                ),
+            )
+        )
         return jsonify({"ok": True, "queued": True, "concurrency": 12})
 
     body = request.get_json(silent=True) or {}
@@ -417,15 +528,17 @@ def api_judgment_stats():
         FROM session_judgments
     """).fetchone()
 
-    return jsonify({
-        "total_judged": total,
-        "outcome_distribution": {r[0]: r[1] for r in outcome_dist},
-        "avg_clarity": round(avgs[0] or 0, 3),
-        "avg_completeness": round(avgs[1] or 0, 3),
-        "avg_productivity": round(avgs[2] or 0, 3),
-        "avg_misalignments": round(avgs[3] or 0, 2),
-        "misalignment_rate": round((avgs[4] or 0) / total, 3) if total else 0,
-    })
+    return jsonify(
+        {
+            "total_judged": total,
+            "outcome_distribution": {r[0]: r[1] for r in outcome_dist},
+            "avg_clarity": round(avgs[0] or 0, 3),
+            "avg_completeness": round(avgs[1] or 0, 3),
+            "avg_productivity": round(avgs[2] or 0, 3),
+            "avg_misalignments": round(avgs[3] or 0, 2),
+            "misalignment_rate": round((avgs[4] or 0) / total, 3) if total else 0,
+        }
+    )
 
 
 @app.route("/api/patterns")
@@ -439,11 +552,57 @@ def api_patterns():
     """).fetchall()
 
     GAP_CATEGORIES = {
-        "context": ["repo", "codebase", "file", "directory", "structure", "existing", "path", "folder", "project"],
-        "requirements": ["expected", "behavior", "output", "format", "specific", "requirement", "result", "goal"],
-        "constraints": ["environment", "version", "dependency", "platform", "setup", "config", "os", "runtime"],
-        "error_details": ["error", "message", "stack", "trace", "log", "exception", "warning", "failure"],
-        "scope": ["which", "where", "boundary", "limit", "priority", "scope", "range", "subset"],
+        "context": [
+            "repo",
+            "codebase",
+            "file",
+            "directory",
+            "structure",
+            "existing",
+            "path",
+            "folder",
+            "project",
+        ],
+        "requirements": [
+            "expected",
+            "behavior",
+            "output",
+            "format",
+            "specific",
+            "requirement",
+            "result",
+            "goal",
+        ],
+        "constraints": [
+            "environment",
+            "version",
+            "dependency",
+            "platform",
+            "setup",
+            "config",
+            "os",
+            "runtime",
+        ],
+        "error_details": [
+            "error",
+            "message",
+            "stack",
+            "trace",
+            "log",
+            "exception",
+            "warning",
+            "failure",
+        ],
+        "scope": [
+            "which",
+            "where",
+            "boundary",
+            "limit",
+            "priority",
+            "scope",
+            "range",
+            "subset",
+        ],
     }
 
     gap_counts = {cat: {"count": 0, "examples": []} for cat in GAP_CATEGORIES}
@@ -468,16 +627,21 @@ def api_patterns():
         except (json.JSONDecodeError, TypeError):
             continue
 
-    prompt_gaps = sorted([
-        {
-            "category": cat,
-            "examples": info["examples"],
-            "count": info["count"],
-            "pct": round(info["count"] / total_gap_items, 2) if total_gap_items else 0,
-        }
-        for cat, info in gap_counts.items()
-        if info["count"] > 0
-    ], key=lambda x: -x["count"])
+    prompt_gaps = sorted(
+        [
+            {
+                "category": cat,
+                "examples": info["examples"],
+                "count": info["count"],
+                "pct": round(info["count"] / total_gap_items, 2)
+                if total_gap_items
+                else 0,
+            }
+            for cat, info in gap_counts.items()
+            if info["count"] > 0
+        ],
+        key=lambda x: -x["count"],
+    )
 
     # --- Misalignment theme clustering ---
     mis_rows = conn.execute("""
@@ -487,37 +651,75 @@ def api_patterns():
 
     THEME_KEYWORDS = {
         "tool_overuse": ["tool", "unnecessary", "redundant", "excessive", "repeated"],
-        "wrong_approach": ["wrong", "incorrect", "different approach", "should have", "instead of"],
-        "scope_drift": ["scope", "beyond", "unrelated", "off-topic", "tangent", "extra"],
+        "wrong_approach": [
+            "wrong",
+            "incorrect",
+            "different approach",
+            "should have",
+            "instead of",
+        ],
+        "scope_drift": [
+            "scope",
+            "beyond",
+            "unrelated",
+            "off-topic",
+            "tangent",
+            "extra",
+        ],
         "format_mismatch": ["format", "style", "convention", "naming", "pattern"],
-        "misunderstood_intent": ["misunderstood", "misinterpret", "not what", "didn't ask", "intent"],
-        "ignored_feedback": ["ignored", "repeated", "already said", "told you", "again"],
+        "misunderstood_intent": [
+            "misunderstood",
+            "misinterpret",
+            "not what",
+            "didn't ask",
+            "intent",
+        ],
+        "ignored_feedback": [
+            "ignored",
+            "repeated",
+            "already said",
+            "told you",
+            "again",
+        ],
     }
 
-    theme_counts = {t: {"count": 0, "example": "", "sessions": []} for t in THEME_KEYWORDS}
+    theme_counts = {
+        t: {"count": 0, "example": "", "sessions": []} for t in THEME_KEYWORDS
+    }
     for (raw,) in mis_rows:
         try:
             items = json.loads(raw) if isinstance(raw, str) else raw
             for item in items:
-                desc = (item.get("description", str(item)) if isinstance(item, dict) else str(item)).lower()
+                desc = (
+                    item.get("description", str(item))
+                    if isinstance(item, dict)
+                    else str(item)
+                ).lower()
                 for theme, keywords in THEME_KEYWORDS.items():
                     if any(kw in desc for kw in keywords):
                         theme_counts[theme]["count"] += 1
                         if not theme_counts[theme]["example"]:
-                            theme_counts[theme]["example"] = item.get("description", str(item)) if isinstance(item, dict) else str(item)
+                            theme_counts[theme]["example"] = (
+                                item.get("description", str(item))
+                                if isinstance(item, dict)
+                                else str(item)
+                            )
                         break
         except (json.JSONDecodeError, TypeError):
             continue
 
-    misalignment_themes = sorted([
-        {
-            "theme": theme.replace("_", " "),
-            "count": info["count"],
-            "example": info["example"],
-        }
-        for theme, info in theme_counts.items()
-        if info["count"] > 0
-    ], key=lambda x: -x["count"])
+    misalignment_themes = sorted(
+        [
+            {
+                "theme": theme.replace("_", " "),
+                "count": info["count"],
+                "example": info["example"],
+            }
+            for theme, info in theme_counts.items()
+            if info["count"] > 0
+        ],
+        key=lambda x: -x["count"],
+    )
 
     # --- Behavioral correlations ---
     correlations = []
@@ -539,12 +741,16 @@ def api_patterns():
         ORDER BY avg_prod DESC
     """).fetchall()
     if len(prompt_bins) >= 2:
-        parts = [f"{b[0]}: {b[1]:.0%} productivity ({b[2]} sessions)" for b in prompt_bins]
-        correlations.append({
-            "factor": "First prompt length",
-            "insight": ". ".join(parts) + ".",
-            "type": "tip",
-        })
+        parts = [
+            f"{b[0]}: {b[1]:.0%} productivity ({b[2]} sessions)" for b in prompt_bins
+        ]
+        correlations.append(
+            {
+                "factor": "First prompt length",
+                "insight": ". ".join(parts) + ".",
+                "type": "tip",
+            }
+        )
 
     # Corrections vs completion
     corr_bins = conn.execute("""
@@ -560,12 +766,17 @@ def api_patterns():
         HAVING n >= 3
     """).fetchall()
     if len(corr_bins) >= 2:
-        parts = [f"{b[0]}: {b[1]:.0f}% completion rate, {b[2]:.0%} productivity ({b[3]} sessions)" for b in corr_bins]
-        correlations.append({
-            "factor": "Corrections impact",
-            "insight": ". ".join(parts) + ".",
-            "type": "tip",
-        })
+        parts = [
+            f"{b[0]}: {b[1]:.0f}% completion rate, {b[2]:.0%} productivity ({b[3]} sessions)"
+            for b in corr_bins
+        ]
+        correlations.append(
+            {
+                "factor": "Corrections impact",
+                "insight": ". ".join(parts) + ".",
+                "type": "tip",
+            }
+        )
 
     # Unique tools vs productivity
     tool_bins = conn.execute("""
@@ -580,12 +791,16 @@ def api_patterns():
         HAVING n >= 3
     """).fetchall()
     if len(tool_bins) >= 2:
-        parts = [f"{b[0]}: {b[1]:.0%} productivity ({b[2]} sessions)" for b in tool_bins]
-        correlations.append({
-            "factor": "Tool breadth",
-            "insight": ". ".join(parts) + ".",
-            "type": "tip",
-        })
+        parts = [
+            f"{b[0]}: {b[1]:.0%} productivity ({b[2]} sessions)" for b in tool_bins
+        ]
+        correlations.append(
+            {
+                "factor": "Tool breadth",
+                "insight": ". ".join(parts) + ".",
+                "type": "tip",
+            }
+        )
 
     # --- Worst sessions ---
     worst = conn.execute("""
@@ -598,19 +813,24 @@ def api_patterns():
         LIMIT 5
     """).fetchall()
 
-    worst_sessions = [{
-        "session_id": w[0],
-        "misalignments": w[1],
-        "outcome": w[2],
-        "prompt_preview": w[3],
-    } for w in worst]
+    worst_sessions = [
+        {
+            "session_id": w[0],
+            "misalignments": w[1],
+            "outcome": w[2],
+            "prompt_preview": w[3],
+        }
+        for w in worst
+    ]
 
-    return jsonify({
-        "prompt_gaps": prompt_gaps,
-        "misalignment_themes": misalignment_themes,
-        "behavioral_correlations": correlations,
-        "worst_sessions": worst_sessions,
-    })
+    return jsonify(
+        {
+            "prompt_gaps": prompt_gaps,
+            "misalignment_themes": misalignment_themes,
+            "behavioral_correlations": correlations,
+            "worst_sessions": worst_sessions,
+        }
+    )
 
 
 @app.route("/api/heatmap")
@@ -629,6 +849,16 @@ def api_heatmap():
         ORDER BY f.day_of_week, f.hour_of_day
     """).fetchall()
 
-    return jsonify({
-        "heatmap": [{"day": r[0], "hour": r[1], "count": r[2], "avg_convergence": round(r[3], 3)} for r in rows],
-    })
+    return jsonify(
+        {
+            "heatmap": [
+                {
+                    "day": r[0],
+                    "hour": r[1],
+                    "count": r[2],
+                    "avg_convergence": round(r[3], 3),
+                }
+                for r in rows
+            ],
+        }
+    )

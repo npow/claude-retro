@@ -1,7 +1,10 @@
 """Convergence/drift/thrash composite scores and trajectory classification."""
 
 from .config import (
-    CONVERGENCE_WEIGHTS, DRIFT_WEIGHTS, THRASH_WEIGHTS, TRAJECTORY_THRESHOLDS,
+    CONVERGENCE_WEIGHTS,
+    DRIFT_WEIGHTS,
+    THRASH_WEIGHTS,
+    TRAJECTORY_THRESHOLDS,
 )
 from .db import get_conn
 
@@ -27,12 +30,25 @@ def compute_scores():
     """).fetchall()
 
     for row in rows:
-        (session_id, duration, tool_errors, tool_uses,
-         prompt_trend, decisions, correction_rate,
-         response_cv, has_pr,
-         keyword_entropy, sidechain_ratio, branch_switches,
-         oscillation, api_errors, rephrasing,
-         abandoned, prompt_count) = row
+        (
+            session_id,
+            duration,
+            tool_errors,
+            tool_uses,
+            prompt_trend,
+            decisions,
+            correction_rate,
+            response_cv,
+            has_pr,
+            keyword_entropy,
+            sidechain_ratio,
+            branch_switches,
+            oscillation,
+            api_errors,
+            rephrasing,
+            abandoned,
+            prompt_count,
+        ) = row
 
         # --- Convergence ---
         # prompt_length_decrease: negative trend is good
@@ -51,12 +67,12 @@ def compute_scores():
 
         w = CONVERGENCE_WEIGHTS
         convergence = (
-            w["prompt_length_decrease"] * c_prompt +
-            w["decision_markers"] * c_decisions +
-            w["low_correction_rate"] * c_correction +
-            w["low_tool_error_rate"] * c_tool_error +
-            w["has_pr"] * c_pr +
-            w["stable_response_length"] * c_stable
+            w["prompt_length_decrease"] * c_prompt
+            + w["decision_markers"] * c_decisions
+            + w["low_correction_rate"] * c_correction
+            + w["low_tool_error_rate"] * c_tool_error
+            + w["has_pr"] * c_pr
+            + w["stable_response_length"] * c_stable
         )
 
         # --- Drift ---
@@ -69,12 +85,12 @@ def compute_scores():
 
         w = DRIFT_WEIGHTS
         drift = (
-            w["keyword_entropy"] * d_entropy +
-            w["increasing_prompt_length"] * d_prompt_inc +
-            w["branch_switches"] * d_branch +
-            w["sidechain_ratio"] * d_sidechain +
-            w["no_decisions"] * d_no_decisions +
-            w["long_session"] * d_long
+            w["keyword_entropy"] * d_entropy
+            + w["increasing_prompt_length"] * d_prompt_inc
+            + w["branch_switches"] * d_branch
+            + w["sidechain_ratio"] * d_sidechain
+            + w["no_decisions"] * d_no_decisions
+            + w["long_session"] * d_long
         )
 
         # --- Thrash ---
@@ -86,11 +102,11 @@ def compute_scores():
 
         w = THRASH_WEIGHTS
         thrash = (
-            w["correction_rate"] * t_correction +
-            w["tool_error_rate"] * t_tool_error +
-            w["rephrasing"] * t_rephrasing +
-            w["oscillating_lengths"] * t_oscillation +
-            w["api_errors"] * t_api_errors
+            w["correction_rate"] * t_correction
+            + w["tool_error_rate"] * t_tool_error
+            + w["rephrasing"] * t_rephrasing
+            + w["oscillating_lengths"] * t_oscillation
+            + w["api_errors"] * t_api_errors
         )
 
         convergence = _clamp(convergence)
@@ -100,25 +116,40 @@ def compute_scores():
         # Trajectory classification
         trajectory = classify_trajectory(convergence, drift, thrash, abandoned)
 
-        conn.execute("""
+        conn.execute(
+            """
             UPDATE sessions SET
                 convergence_score = ?, drift_score = ?, thrash_score = ?,
                 trajectory = ?
             WHERE session_id = ?
-        """, [convergence, drift, thrash, trajectory, session_id])
+        """,
+            [convergence, drift, thrash, trajectory, session_id],
+        )
 
     return len(rows)
 
 
-def classify_trajectory(convergence: float, drift: float, thrash: float, abandoned: bool) -> str:
+def classify_trajectory(
+    convergence: float, drift: float, thrash: float, abandoned: bool
+) -> str:
     if abandoned:
         return "abandoned"
     t = TRAJECTORY_THRESHOLDS
-    if convergence >= t["converged"]["convergence_min"] and drift <= t["converged"]["drift_max"] and thrash <= t["converged"]["thrash_max"]:
+    if (
+        convergence >= t["converged"]["convergence_min"]
+        and drift <= t["converged"]["drift_max"]
+        and thrash <= t["converged"]["thrash_max"]
+    ):
         return "converged"
-    if drift >= t["drifted"]["drift_min"] and convergence <= t["drifted"]["convergence_max"]:
+    if (
+        drift >= t["drifted"]["drift_min"]
+        and convergence <= t["drifted"]["convergence_max"]
+    ):
         return "drifted"
-    if thrash >= t["thrashed"]["thrash_min"] and convergence <= t["thrashed"]["convergence_max"]:
+    if (
+        thrash >= t["thrashed"]["thrash_min"]
+        and convergence <= t["thrashed"]["convergence_max"]
+    ):
         return "thrashed"
     if convergence >= 0.4:
         return "mixed"

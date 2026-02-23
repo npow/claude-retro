@@ -833,6 +833,96 @@ def api_patterns():
     )
 
 
+@app.route("/api/skills/dimensions")
+def api_skill_dimensions():
+    from .config import SKILL_DIMENSIONS
+
+    dims = []
+    for dim_id in sorted(SKILL_DIMENSIONS.keys(), key=lambda x: int(x[1:])):
+        d = SKILL_DIMENSIONS[dim_id]
+        dims.append(
+            {
+                "id": dim_id,
+                "name": d["name"],
+                "short": d["short"],
+                "weight": d["weight"],
+                "color": d["color"],
+            }
+        )
+    return jsonify({"dimensions": dims})
+
+
+@app.route("/api/skills/profile")
+def api_skill_profile():
+    conn = get_conn()
+
+    profile = conn.execute("SELECT * FROM skill_profile WHERE id = 1").fetchone()
+    if not profile:
+        return jsonify({"profile": None})
+
+    cols = [d[0] for d in conn.description]
+    p = _row_to_dict(profile, cols)
+    return jsonify({"profile": p})
+
+
+@app.route("/api/skills/session/<session_id>")
+def api_skill_session(session_id):
+    conn = get_conn()
+
+    row = conn.execute(
+        "SELECT * FROM session_skills WHERE session_id = ?", [session_id]
+    ).fetchone()
+    if not row:
+        return jsonify({"skills": None})
+
+    cols = [d[0] for d in conn.description]
+    return jsonify({"skills": _row_to_dict(row, cols)})
+
+
+@app.route("/api/skills/nudges")
+def api_skill_nudges():
+    from .config import SKILL_DIMENSIONS
+
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT id, dimension, current_level, target_level, nudge_text,
+               evidence, frequency, dismissed, created_at
+        FROM skill_nudges
+        WHERE dismissed = FALSE
+        ORDER BY created_at DESC
+    """).fetchall()
+
+    cols = [
+        "id",
+        "dimension",
+        "current_level",
+        "target_level",
+        "nudge_text",
+        "evidence",
+        "frequency",
+        "dismissed",
+        "created_at",
+    ]
+
+    nudges = []
+    for r in rows:
+        nd = _row_to_dict(r, cols)
+        dim_id = nd.get("dimension", "")
+        dim_info = SKILL_DIMENSIONS.get(dim_id, {})
+        nd["dimension_name"] = dim_info.get("name", dim_id)
+        nd["dimension_color"] = dim_info.get("color", "#8b8fa3")
+        nudges.append(nd)
+
+    return jsonify({"nudges": nudges})
+
+
+@app.route("/api/skills/nudges/<int:nid>/dismiss", methods=["POST"])
+def api_dismiss_skill_nudge(nid):
+    conn = get_conn()
+    conn.execute("UPDATE skill_nudges SET dismissed = TRUE WHERE id = ?", [nid])
+    return jsonify({"ok": True})
+
+
 @app.route("/api/heatmap")
 def api_heatmap():
     conn = get_conn()

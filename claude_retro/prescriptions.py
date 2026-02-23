@@ -22,6 +22,7 @@ def generate_prescriptions():
     count += _judgment_prompt_quality_insight(conn)
     count += _judgment_misalignment_insight(conn)
     count += _judgment_underspec_patterns(conn)
+    count += _skill_gap_prescriptions(conn)
     return count
 
 
@@ -44,6 +45,7 @@ def generate_actions():
     actions += _action_prompt_length_correlation(conn)
     actions += _action_correction_impact(conn)
     actions += _action_tool_focus(conn)
+    actions += _action_skill_gaps(conn)
     return actions
 
 
@@ -896,3 +898,94 @@ def _action_tool_focus(conn):
             "evidence": f"{f_n} focused vs {b_n} broad sessions",
         }
     ]
+
+
+# ---------------------------------------------------------------------------
+# Skill-gap prescription generators
+# ---------------------------------------------------------------------------
+
+
+def _skill_gap_prescriptions(conn) -> int:
+    """Generate prescriptions from top skill gaps."""
+    from .config import SKILL_DIMENSIONS, SKILL_NUDGES
+
+    profile = conn.execute("SELECT * FROM skill_profile WHERE id = 1").fetchone()
+    if not profile:
+        return 0
+
+    cols = [d[0] for d in conn.description]
+    p = dict(zip(cols, profile))
+
+    count = 0
+    for gap_key in ["gap_1", "gap_2", "gap_3"]:
+        dim_id = p.get(gap_key)
+        if not dim_id:
+            continue
+
+        dim_info = SKILL_DIMENSIONS.get(dim_id, {})
+        dim_name = dim_info.get("name", dim_id)
+        dim_num = int(dim_id[1:])
+        current_score = p.get(f"d{dim_num}_score", 0)
+        current_level = int(current_score)
+        target_level = current_level + 1
+
+        nudge_text = SKILL_NUDGES.get((dim_id, target_level))
+        if not nudge_text:
+            continue
+
+        conn.execute(
+            """
+            INSERT INTO prescriptions (category, title, description, evidence, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            [
+                "skill_gap",
+                f"Level up {dim_name} (L{current_level} -> L{target_level})",
+                nudge_text,
+                f"Skill assessment across {p.get('session_count', 0)} sessions.",
+                0.7,
+            ],
+        )
+        count += 1
+
+    return count
+
+
+def _action_skill_gaps(conn):
+    """Generate action items from skill gaps."""
+    from .config import SKILL_DIMENSIONS, SKILL_NUDGES
+
+    profile = conn.execute("SELECT * FROM skill_profile WHERE id = 1").fetchone()
+    if not profile:
+        return []
+
+    cols = [d[0] for d in conn.description]
+    p = dict(zip(cols, profile))
+
+    actions = []
+    for gap_key in ["gap_1", "gap_2", "gap_3"]:
+        dim_id = p.get(gap_key)
+        if not dim_id:
+            continue
+
+        dim_info = SKILL_DIMENSIONS.get(dim_id, {})
+        dim_name = dim_info.get("name", dim_id)
+        dim_num = int(dim_id[1:])
+        current_score = p.get(f"d{dim_num}_score", 0)
+        current_level = int(current_score)
+        target_level = current_level + 1
+
+        nudge_text = SKILL_NUDGES.get((dim_id, target_level))
+        if not nudge_text:
+            continue
+
+        actions.append(
+            {
+                "type": "tip",
+                "title": f"Level up: {dim_name} (L{current_level} -> L{target_level})",
+                "body": nudge_text,
+                "evidence": f"Skill assessment across {p.get('session_count', 0)} sessions",
+            }
+        )
+
+    return actions

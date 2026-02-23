@@ -124,12 +124,13 @@ class IngestionWorker(threading.Thread):
         from .ingest import run_ingest
         from .sessions import build_sessions, build_tool_usage
         from .features import extract_features
+        from .skills import assess_skills
         from .scoring import compute_scores
         from .intents import classify_all_intents
         from .baselines import compute_baselines
         from .prescriptions import generate_prescriptions
 
-        n = 8
+        n = 9
         self._set_status("Ingesting JSONL files", 1, n)
         run_ingest()
         self._set_status("Building sessions", 2, n)
@@ -138,13 +139,15 @@ class IngestionWorker(threading.Thread):
         build_tool_usage()
         self._set_status("Extracting features", 4, n)
         extract_features()
-        self._set_status("Computing scores", 5, n)
+        self._set_status("Assessing skills", 5, n)
+        assess_skills()
+        self._set_status("Computing scores", 6, n)
         compute_scores()
-        self._set_status("Classifying intents", 6, n)
+        self._set_status("Classifying intents", 7, n)
         classify_all_intents()
-        self._set_status("Computing baselines", 7, n)
+        self._set_status("Computing baselines", 8, n)
         compute_baselines()
-        self._set_status("Generating prescriptions", 8, n)
+        self._set_status("Generating prescriptions", 9, n)
         generate_prescriptions()
         self._set_idle()
 
@@ -153,14 +156,15 @@ class IngestionWorker(threading.Thread):
         from .ingest import run_ingest
         from .sessions import build_sessions, build_tool_usage
         from .features import extract_features
+        from .skills import assess_skills
         from .scoring import compute_scores
         from .intents import classify_all_intents
         from .baselines import compute_baselines
         from .prescriptions import generate_prescriptions
         from .llm_judge import judge_sessions
 
-        # Phase 1: fast pipeline (8 steps)
-        n = 8
+        # Phase 1: fast pipeline (9 steps)
+        n = 9
         self._set_status("Ingesting JSONL files", 1, n)
         run_ingest()
         self._set_status("Building sessions", 2, n)
@@ -169,13 +173,15 @@ class IngestionWorker(threading.Thread):
         build_tool_usage()
         self._set_status("Extracting features", 4, n)
         extract_features()
-        self._set_status("Computing scores", 5, n)
+        self._set_status("Assessing skills", 5, n)
+        assess_skills()
+        self._set_status("Computing scores", 6, n)
         compute_scores()
-        self._set_status("Classifying intents", 6, n)
+        self._set_status("Classifying intents", 7, n)
         classify_all_intents()
-        self._set_status("Computing baselines", 7, n)
+        self._set_status("Computing baselines", 8, n)
         compute_baselines()
-        self._set_status("Generating prescriptions", 8, n)
+        self._set_status("Generating prescriptions", 9, n)
         generate_prescriptions()
 
         # Phase 2: LLM judging (reports per-session progress)

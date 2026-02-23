@@ -307,6 +307,59 @@ tr:hover td { background: var(--surface2); }
 .heatmap-cell:hover { color: var(--text); transform: scale(1.2); }
 .heatmap-header { text-align: center; color: var(--text-dim); padding: 2px; }
 
+/* ===== SKILLS TAB ===== */
+.radar-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 20px;
+}
+.radar-card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.radar-wrap { position: relative; height: 320px; max-width: 400px; margin: 0 auto; }
+
+.skill-dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.skill-dim-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.skill-dim-header { display: flex; align-items: center; justify-content: space-between; }
+.skill-dim-name { font-size: 13px; font-weight: 600; }
+.skill-dim-levels { display: flex; gap: 3px; align-items: center; }
+.skill-dim-levels .level-dot {
+  width: 18px; height: 6px; border-radius: 3px; background: var(--surface2);
+}
+.skill-dim-levels .level-dot.filled { background: var(--accent); }
+.skill-dim-levels .level-dot.opportunity { background: var(--yellow); opacity: 0.5; }
+.skill-dim-gap {
+  font-size: 11px; color: var(--text-dim); line-height: 1.4;
+}
+
+.nudge-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.nudge-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; border-left: 3px solid var(--yellow);
+}
+.nudge-card .nudge-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+}
+.nudge-card .nudge-dim {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.nudge-card .nudge-level { font-size: 11px; color: var(--text-dim); }
+.nudge-card .nudge-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.nudge-card .nudge-dismiss {
+  font-size: 11px; color: var(--text-dim); cursor: pointer; margin-top: 4px;
+  display: inline-block;
+}
+.nudge-card .nudge-dismiss:hover { color: var(--text); }
+
+/* Skill badges in session detail */
+.skill-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.skill-badge {
+  display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px;
+  border-radius: 4px; font-size: 10px; font-weight: 600;
+  background: rgba(99,102,241,0.1); color: var(--accent2);
+}
+.skill-badge.has-gap { background: rgba(234,179,8,0.1); color: var(--yellow); }
+
 /* Loading */
 .loading { text-align: center; padding: 40px; color: var(--text-dim); }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -362,6 +415,7 @@ tr:hover td { background: var(--surface2); }
   <!-- TAB BAR -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="sessions" onclick="switchTab('sessions')">Sessions</button>
+    <button class="tab-btn" data-tab="skills" onclick="switchTab('skills')">Skills</button>
     <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')">Charts</button>
     <button class="tab-btn" data-tab="projects" onclick="switchTab('projects')">Projects</button>
   </div>
@@ -384,6 +438,18 @@ tr:hover td { background: var(--surface2); }
     </div>
     <div class="session-feed" id="session-feed"></div>
     <div class="load-more" id="load-more" style="display:none" onclick="loadMoreSessions()">Load more sessions...</div>
+  </div>
+
+  <!-- TAB: Skills -->
+  <div class="tab-content" id="tab-skills">
+    <div class="radar-card">
+      <h3>Skill Profile</h3>
+      <div class="radar-wrap"><canvas id="chart-skills-radar"></canvas></div>
+    </div>
+    <div class="section-label">Dimensions</div>
+    <div class="skill-dims" id="skill-dims"></div>
+    <div class="section-label">Improvement Nudges</div>
+    <div class="nudge-cards" id="skill-nudges"></div>
   </div>
 
   <!-- TAB: Charts -->
@@ -542,6 +608,37 @@ async function loadVerdict() {
       <div class="vs"><strong>${jStats.avg_misalignments}</strong> avg misalign</div>
       ${unjudged > 0 ? `<div class="vs" style="color:var(--text-dim)"><strong>${unjudged}</strong> unjudged</div>` : ''}
     </div>`;
+
+  // Add skill summary line
+  try {
+    const skillProfile = await api('/api/skills/profile');
+    const sp = skillProfile.profile;
+    if (sp && window._skillDims) {
+      const dims = window._skillDims;
+      let best = null, bestScore = -1;
+      let gapDim = sp.gap_1;
+
+      for (const d of dims) {
+        const num = parseInt(d.id.slice(1));
+        const score = sp['d' + num + '_score'] || 0;
+        if (score > bestScore) { bestScore = score; best = d; }
+      }
+
+      if (best && bestScore > 0) {
+        const gapInfo = gapDim ? dims.find(d => d.id === gapDim) : null;
+        const gapNum = gapDim ? parseInt(gapDim.slice(1)) : 0;
+        const gapScore = gapNum ? (sp['d' + gapNum + '_score'] || 0) : 0;
+
+        let skillLine = `<div style="font-size:13px;color:var(--text-dim);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">`;
+        skillLine += `Strongest: <strong style="color:${best.color}">${best.short} (L${Math.floor(bestScore)})</strong>`;
+        if (gapInfo) {
+          skillLine += ` &middot; Biggest gap: <strong style="color:var(--yellow)">${gapInfo.short} (L${Math.floor(gapScore)} &#8594; L${Math.floor(gapScore) + 1})</strong>`;
+        }
+        skillLine += `</div>`;
+        el.innerHTML += skillLine;
+      }
+    }
+  } catch (e) { /* skill data not available yet */ }
 
   // Store for use by change cards
   window._patterns = patterns;
@@ -717,10 +814,11 @@ async function toggleSession(sessionId, cardEl) {
   loadingDiv.innerHTML = '<div class="loading"><span class="spinner"></span></div>';
   cardEl.appendChild(loadingDiv);
 
-  // Fetch detail + timeline
-  const [detail, timeline] = await Promise.all([
+  // Fetch detail + timeline + skills
+  const [detail, timeline, skillsData] = await Promise.all([
     api(`/api/sessions/${sessionId}`),
-    api(`/api/sessions/${sessionId}/timeline`)
+    api(`/api/sessions/${sessionId}/timeline`),
+    api(`/api/skills/session/${sessionId}`),
   ]);
 
   const s = detail.session;
@@ -736,6 +834,11 @@ async function toggleSession(sessionId, cardEl) {
   html += intentBadge(s.intent) + ' ' + trajectoryBadge(s.trajectory);
   html += ` <span style="font-size:12px;color:var(--text-dim);margin-left:8px">${shortProject(s.project_name)}</span>`;
   html += '</div>';
+
+  // Skill badges
+  if (skillsData.skills) {
+    html += renderSkillBadges(skillsData.skills);
+  }
 
   if (j) {
     // Outcome reasoning
@@ -934,6 +1037,7 @@ function populateFilters(projects) {
 // ===== TABS =====
 let chartsLoaded = false;
 let projectsLoaded = false;
+let skillsLoaded = false;
 
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -942,6 +1046,10 @@ function switchTab(tabName) {
   document.getElementById('tab-' + tabName).classList.add('active');
 
   // Lazy-load tab content on first view (avoids Chart.js zero-dimension bug)
+  if (tabName === 'skills' && !skillsLoaded) {
+    skillsLoaded = true;
+    loadSkills();
+  }
   if (tabName === 'charts' && !chartsLoaded) {
     chartsLoaded = true;
     loadCharts();
@@ -950,6 +1058,142 @@ function switchTab(tabName) {
     projectsLoaded = true;
     loadProjectHealth();
   }
+}
+
+// ===== SKILLS TAB =====
+async function loadSkills() {
+  const [dims, profile, nudges] = await Promise.all([
+    api('/api/skills/dimensions'),
+    api('/api/skills/profile'),
+    api('/api/skills/nudges'),
+  ]);
+
+  const p = profile.profile;
+  const dimList = dims.dimensions;
+
+  // Radar chart
+  if (p) {
+    destroyChart('skillsRadar');
+    const labels = dimList.map(d => d.short);
+    const scores = dimList.map(d => {
+      const num = parseInt(d.id.slice(1));
+      return p['d' + num + '_score'] || 0;
+    });
+
+    charts.skillsRadar = new Chart(document.getElementById('chart-skills-radar'), {
+      type: 'radar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Skill Level',
+          data: scores,
+          backgroundColor: 'rgba(99,102,241,0.15)',
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          pointBackgroundColor: '#6366f1',
+          pointBorderColor: '#6366f1',
+          pointRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0,
+            max: 5,
+            ticks: {
+              stepSize: 1,
+              color: '#8b8fa3',
+              backdropColor: 'transparent',
+              font: { size: 10 },
+            },
+            grid: { color: '#2e3347' },
+            angleLines: { color: '#2e3347' },
+            pointLabels: { color: '#e4e4e7', font: { size: 11, weight: '500' } },
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => `Level ${ctx.raw.toFixed(1)}`,
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Dimension cards
+  const dimsContainer = document.getElementById('skill-dims');
+  if (p) {
+    const gaps = [p.gap_1, p.gap_2, p.gap_3].filter(Boolean);
+    dimsContainer.innerHTML = dimList.map(d => {
+      const num = parseInt(d.id.slice(1));
+      const score = p['d' + num + '_score'] || 0;
+      const level = Math.floor(score);
+      const isGap = gaps.includes(d.id);
+
+      let dots = '';
+      for (let i = 1; i <= 5; i++) {
+        const cls = i <= level ? 'filled' : (isGap && i === level + 1 ? 'opportunity' : '');
+        dots += `<div class="level-dot ${cls}" style="${i <= level ? 'background:' + d.color : ''}"></div>`;
+      }
+
+      return `<div class="skill-dim-card" style="border-left: 3px solid ${d.color}">
+        <div class="skill-dim-header">
+          <span class="skill-dim-name">${d.name}</span>
+          <div class="skill-dim-levels">${dots}</div>
+        </div>
+        <div class="skill-dim-gap">
+          L${level} (${score.toFixed(1)})${isGap ? ' <span style="color:var(--yellow)">&#9650; gap</span>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    dimsContainer.innerHTML = '<div class="empty-state">No skill data yet. Run ingest to analyze sessions.</div>';
+  }
+
+  // Nudge cards
+  const nudgeContainer = document.getElementById('skill-nudges');
+  if (nudges.nudges.length > 0) {
+    nudgeContainer.innerHTML = nudges.nudges.map(n => `
+      <div class="nudge-card" id="nudge-${n.id}" style="border-left-color:${n.dimension_color}">
+        <div class="nudge-header">
+          <span class="nudge-dim" style="color:${n.dimension_color}">${n.dimension_name}</span>
+          <span class="nudge-level">L${n.current_level} &#8594; L${n.target_level}</span>
+        </div>
+        <div class="nudge-text">${n.nudge_text}</div>
+        <span class="nudge-dismiss" onclick="event.stopPropagation(); dismissNudge(${n.id})">dismiss</span>
+      </div>
+    `).join('');
+  } else {
+    nudgeContainer.innerHTML = '<div class="empty-state">No nudges yet.</div>';
+  }
+}
+
+async function dismissNudge(id) {
+  await fetch('/api/skills/nudges/' + id + '/dismiss', { method: 'POST' });
+  const el = document.getElementById('nudge-' + id);
+  if (el) el.remove();
+}
+
+function renderSkillBadges(skills) {
+  if (!skills || !window._skillDims) return '';
+  const dims = window._skillDims;
+  let html = '<div class="skill-badges">';
+  for (const d of dims) {
+    const num = parseInt(d.id.slice(1));
+    const level = skills['d' + num + '_level'] || 0;
+    const opp = skills['d' + num + '_opportunity'] || 0;
+    if (level > 0 || opp > 0) {
+      const hasGap = opp > level;
+      html += `<span class="skill-badge${hasGap ? ' has-gap' : ''}" style="${!hasGap ? 'border-left:2px solid ' + d.color : ''}">L${level} ${d.short}${hasGap ? ' &#9650;' : ''}</span>`;
+    }
+  }
+  html += '</div>';
+  return html;
 }
 
 async function loadCharts() {
@@ -1139,8 +1383,12 @@ async function init() {
 
   // Load the page immediately with whatever data exists
   try {
-    const projects = await api('/api/projects');
+    const [projects, skillDims] = await Promise.all([
+      api('/api/projects'),
+      api('/api/skills/dimensions'),
+    ]);
     populateFilters(projects.projects);
+    window._skillDims = skillDims.dimensions;
   } catch (e) {
     // Server not up yet — show connecting state and retry
     progressEl.style.display = 'block';
@@ -1207,6 +1455,7 @@ async function pollBackgroundStatus() {
     await loadSessions(false);
     chartsLoaded = false;
     projectsLoaded = false;
+    skillsLoaded = false;
     const activeTab = document.querySelector('.tab-btn.active');
     if (activeTab) switchTab(activeTab.dataset.tab);
 

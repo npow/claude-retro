@@ -226,3 +226,70 @@ def init_schema(conn: duckdb.DuckDBPyConnection):
             ingested_at TIMESTAMP DEFAULT current_timestamp
         )
     """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS session_skills (
+            session_id VARCHAR PRIMARY KEY,
+            d1_level INTEGER DEFAULT 0,
+            d1_opportunity INTEGER DEFAULT 0,
+            d2_level INTEGER DEFAULT 0,
+            d2_opportunity INTEGER DEFAULT 0,
+            d3_level INTEGER DEFAULT 0,
+            d3_opportunity INTEGER DEFAULT 0,
+            d4_level INTEGER DEFAULT 0,
+            d4_opportunity INTEGER DEFAULT 0,
+            d5_level INTEGER DEFAULT 0,
+            d5_opportunity INTEGER DEFAULT 0,
+            d6_level INTEGER DEFAULT 0,
+            d6_opportunity INTEGER DEFAULT 0,
+            d7_level INTEGER DEFAULT 0,
+            d7_opportunity INTEGER DEFAULT 0,
+            d8_level INTEGER DEFAULT 0,
+            d8_opportunity INTEGER DEFAULT 0,
+            d9_level INTEGER DEFAULT 0,
+            d9_opportunity INTEGER DEFAULT 0,
+            d10_level INTEGER DEFAULT 0,
+            d10_opportunity INTEGER DEFAULT 0,
+            detection_confidence DOUBLE DEFAULT 0.0,
+            assessed_at TIMESTAMP DEFAULT current_timestamp
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_profile (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            d1_score DOUBLE DEFAULT 0.0,
+            d2_score DOUBLE DEFAULT 0.0,
+            d3_score DOUBLE DEFAULT 0.0,
+            d4_score DOUBLE DEFAULT 0.0,
+            d5_score DOUBLE DEFAULT 0.0,
+            d6_score DOUBLE DEFAULT 0.0,
+            d7_score DOUBLE DEFAULT 0.0,
+            d8_score DOUBLE DEFAULT 0.0,
+            d9_score DOUBLE DEFAULT 0.0,
+            d10_score DOUBLE DEFAULT 0.0,
+            gap_1 VARCHAR,
+            gap_2 VARCHAR,
+            gap_3 VARCHAR,
+            session_count INTEGER DEFAULT 0,
+            computed_at TIMESTAMP DEFAULT current_timestamp
+        )
+    """)
+
+    conn.execute("""
+        CREATE SEQUENCE IF NOT EXISTS skill_nudge_seq START 1
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_nudges (
+            id INTEGER DEFAULT nextval('skill_nudge_seq') PRIMARY KEY,
+            dimension VARCHAR,
+            current_level INTEGER DEFAULT 0,
+            target_level INTEGER DEFAULT 0,
+            nudge_text TEXT,
+            evidence TEXT,
+            frequency INTEGER DEFAULT 1,
+            dismissed BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT current_timestamp
+        )
+    """)

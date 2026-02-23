@@ -11,6 +11,7 @@ def main():
         from .ingest import run_ingest
         from .sessions import build_sessions, build_tool_usage
         from .features import extract_features
+        from .skills import assess_skills
         from .scoring import compute_scores
         from .intents import classify_all_intents
         from .baselines import compute_baselines
@@ -39,6 +40,10 @@ def main():
         print("Extracting features...")
         n = extract_features()
         print(f"  {n} sessions processed")
+
+        print("Assessing skills...")
+        n = assess_skills()
+        print(f"  {n} sessions assessed")
 
         print("Computing scores...")
         n = compute_scores()

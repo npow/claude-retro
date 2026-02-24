@@ -23,14 +23,42 @@ def find_jsonl_files() -> list[tuple[Path, str]]:
 
 
 def needs_ingestion(file_path: Path, conn) -> bool:
-    """Check if file needs (re-)ingestion based on mtime."""
+    """Check if file needs (re-)ingestion based on mtime and skip cache."""
     mtime = os.path.getmtime(file_path)
+
+    # Check skip cache first (files that failed parsing)
+    skip_result = conn.execute(
+        "SELECT mtime FROM skip_cache WHERE file_path = ?", [str(file_path)]
+    ).fetchone()
+    if skip_result is not None:
+        # Skip if mtime hasn't changed since last failure
+        if mtime <= skip_result[0]:
+            return False
+
+    # Check ingestion log
     result = conn.execute(
         "SELECT mtime FROM ingestion_log WHERE file_path = ?", [str(file_path)]
     ).fetchone()
     if result is None:
         return True
     return mtime > result[0]
+
+
+def mark_skip(file_path: Path, error_type: str, error_message: str, conn):
+    """Mark a file to be skipped until its mtime changes."""
+    mtime = os.path.getmtime(file_path)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO skip_cache (file_path, mtime, error_type, error_message, skip_until)
+        VALUES (?, ?, ?, ?, datetime('now', '+1 day'))
+        """,
+        [str(file_path), mtime, error_type, error_message[:500]],
+    )
+
+
+def clear_skip(file_path: Path, conn):
+    """Clear a file from the skip cache after successful ingestion."""
+    conn.execute("DELETE FROM skip_cache WHERE file_path = ?", [str(file_path)])
 
 
 def parse_entry(line: str, project_name: str) -> dict | None:
@@ -215,15 +243,28 @@ def run_ingest() -> dict:
         "ingested_files": 0,
         "total_entries": 0,
         "skipped_files": 0,
+        "failed_files": 0,
     }
 
     for file_path, project_name in files:
         if not needs_ingestion(file_path, conn):
             stats["skipped_files"] += 1
             continue
-        count = ingest_file(file_path, project_name, conn)
-        stats["ingested_files"] += 1
-        stats["total_entries"] += count
+
+        try:
+            count = ingest_file(file_path, project_name, conn)
+            stats["ingested_files"] += 1
+            stats["total_entries"] += count
+            # Clear from skip cache on success
+            clear_skip(file_path, conn)
+        except Exception as e:
+            # Mark file to skip until mtime changes
+            error_type = type(e).__name__
+            error_message = str(e)
+            mark_skip(file_path, error_type, error_message, conn)
+            stats["failed_files"] += 1
+            # Log but don't crash the whole ingestion
+            print(f"[ingest] Failed to ingest {file_path}: {error_type}: {error_message}")
 
     # Get total counts
     stats["total_entries_in_db"] = conn.execute(

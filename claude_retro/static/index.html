@@ -367,6 +367,14 @@ tr:hover td { background: var(--surface2); }
 
 /* Empty state */
 .empty-state { text-align: center; padding: 32px; color: var(--text-dim); font-size: 14px; }
+
+/* Footer */
+.footer {
+  margin-top: 40px; padding: 16px 0; border-top: 1px solid var(--border);
+  text-align: center; font-size: 11px; color: var(--text-dim);
+}
+.footer a { color: var(--accent2); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -387,6 +395,9 @@ tr:hover td { background: var(--surface2); }
         <option value="24">24 parallel</option>
       </select>
       <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">Run LLM Judge</button>
+      <a href="/api/export" download style="text-decoration:none">
+        <button class="refresh-btn" style="background:var(--surface2);color:var(--text)">Export HTML</button>
+      </a>
     </div>
   </div>
 
@@ -481,6 +492,11 @@ tr:hover td { background: var(--surface2); }
         <tbody></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Claude Retro <span id="version-info">loading...</span>
   </div>
 
 </div>
@@ -1406,64 +1422,167 @@ async function init() {
     loadSessions(false),
   ]);
 
-  // Check if background work is happening and show inline progress
-  pollBackgroundStatus();
+  // Connect to SSE for real-time updates
+  connectEventStream();
+
+  // Load version info
+  loadVersionInfo();
 }
 
-async function pollBackgroundStatus() {
+async function loadVersionInfo() {
+  try {
+    const version = await api('/api/version');
+    const el = document.getElementById('version-info');
+    el.textContent = `v${version.version} (${version.commit.substring(0, 7)})`;
+    el.title = `Build date: ${version.build_date}`;
+  } catch (e) {
+    console.error('Failed to load version info:', e);
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  // Ignore if typing in input/textarea
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    return;
+  }
+
+  // r - Run LLM Judge
+  if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    const btn = document.getElementById('refresh-btn');
+    if (btn && !btn.disabled) {
+      btn.click();
+    }
+  }
+
+  // e - Export to HTML
+  if (e.key === 'e' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    window.location.href = '/api/export';
+  }
+
+  // j/k - Navigate sessions
+  if ((e.key === 'j' || e.key === 'k') && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    const sessions = Array.from(document.querySelectorAll('.session-card'));
+    if (sessions.length === 0) return;
+
+    let currentIndex = sessions.findIndex(s => s.classList.contains('expanded'));
+    if (currentIndex === -1) {
+      // No session expanded, expand first
+      sessions[0].click();
+    } else {
+      // Navigate up/down
+      const nextIndex = e.key === 'j'
+        ? Math.min(currentIndex + 1, sessions.length - 1)
+        : Math.max(currentIndex - 1, 0);
+      if (nextIndex !== currentIndex) {
+        sessions[nextIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        sessions[nextIndex].click();
+      }
+    }
+  }
+
+  // ? - Show help
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    alert(`Keyboard Shortcuts:
+
+r - Run LLM Judge
+j - Next session
+k - Previous session
+e - Export (coming soon)
+? - Show this help`);
+  }
+});
+
+// SSE connection for real-time updates
+let eventSource = null;
+let wasWorking = false;
+
+function connectEventStream() {
+  if (eventSource) {
+    eventSource.close();
+  }
+
+  eventSource = new EventSource('/api/events');
+
+  eventSource.addEventListener('status', (e) => {
+    const status = JSON.parse(e.data);
+    updateBackgroundStatus(status);
+  });
+
+  eventSource.onerror = (e) => {
+    console.error('EventSource error:', e);
+    // Auto-reconnect on error
+    setTimeout(() => {
+      if (eventSource.readyState === EventSource.CLOSED) {
+        connectEventStream();
+      }
+    }, 3000);
+  };
+}
+
+async function updateBackgroundStatus(status) {
   const progressEl = document.getElementById('refresh-progress');
   const stepEl = document.getElementById('refresh-step');
   const countEl = document.getElementById('refresh-count');
   const barEl = document.getElementById('refresh-bar');
   const btn = document.getElementById('refresh-btn');
 
+  if (!status.ready) {
+    // Show inline progress bar
+    progressEl.style.display = 'block';
+    stepEl.textContent = status.step || 'Working...';
+    btn.disabled = true;
+    btn.textContent = status.state === 'judging' ? 'Judging...' : 'Running...';
+
+    if (status.total > 0) {
+      const pct = Math.round(status.current / status.total * 100);
+      barEl.style.width = pct + '%';
+      countEl.textContent = `${status.current} / ${status.total}`;
+    } else {
+      barEl.style.width = '10%';
+      countEl.textContent = '';
+    }
+
+    wasWorking = true;
+  } else {
+    // Background work is done
+    if (wasWorking) {
+      // Was showing progress — reload data
+      stepEl.textContent = 'Complete!';
+      barEl.style.width = '100%';
+      countEl.textContent = '';
+
+      await Promise.all([loadVerdict(), loadChangeCards()]);
+      expandedSessionId = null;
+      await loadSessions(false);
+      chartsLoaded = false;
+      projectsLoaded = false;
+      skillsLoaded = false;
+      const activeTab = document.querySelector('.tab-btn.active');
+      if (activeTab) switchTab(activeTab.dataset.tab);
+
+      setTimeout(() => { progressEl.style.display = 'none'; }, 2000);
+      wasWorking = false;
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Run LLM Judge';
+  }
+}
+
+// Fallback polling for when SSE is not available
+async function pollBackgroundStatus() {
   try {
     const status = await api('/api/status');
-    if (!status.ready) {
-      // Show inline progress bar
-      progressEl.style.display = 'block';
-      stepEl.textContent = status.step || 'Working...';
-      btn.disabled = true;
-      btn.textContent = status.state === 'judging' ? 'Judging...' : 'Running...';
-
-      if (status.total > 0) {
-        const pct = Math.round(status.current / status.total * 100);
-        barEl.style.width = pct + '%';
-        countEl.textContent = `${status.current} / ${status.total}`;
-      } else {
-        barEl.style.width = '10%';
-        countEl.textContent = '';
-      }
-
-      setTimeout(pollBackgroundStatus, 1000);
-      return;
-    }
+    await updateBackgroundStatus(status);
   } catch (e) {
-    setTimeout(pollBackgroundStatus, 2000);
-    return;
+    console.error('Failed to poll status:', e);
   }
-
-  // Background work is done
-  if (progressEl.style.display === 'block') {
-    // Was showing progress — reload data
-    stepEl.textContent = 'Complete!';
-    barEl.style.width = '100%';
-    countEl.textContent = '';
-
-    await Promise.all([loadVerdict(), loadChangeCards()]);
-    expandedSessionId = null;
-    await loadSessions(false);
-    chartsLoaded = false;
-    projectsLoaded = false;
-    skillsLoaded = false;
-    const activeTab = document.querySelector('.tab-btn.active');
-    if (activeTab) switchTab(activeTab.dataset.tab);
-
-    setTimeout(() => { progressEl.style.display = 'none'; }, 2000);
-  }
-
-  btn.disabled = false;
-  btn.textContent = 'Run LLM Judge';
+  setTimeout(pollBackgroundStatus, 2000);
 }
 
 init();

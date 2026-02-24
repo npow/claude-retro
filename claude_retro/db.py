@@ -1,4 +1,4 @@
-"""DuckDB connection and schema initialization."""
+"""DuckDB connection and schema initialization with separate read/write pools."""
 
 import subprocess
 import sys
@@ -9,6 +9,8 @@ import duckdb
 from .config import DB_PATH
 
 _local = threading.local()
+_writer_lock = threading.Lock()
+_writer_conn = None
 
 # Maximum seconds to wait for the DuckDB lock before giving up
 LOCK_TIMEOUT = 30
@@ -32,37 +34,66 @@ def _find_lock_holder() -> str:
     return "unknown process"
 
 
-def get_conn() -> duckdb.DuckDBPyConnection:
-    if not hasattr(_local, "conn"):
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        deadline = time.monotonic() + LOCK_TIMEOUT
-        attempt = 0
-        while True:
-            try:
-                _local.conn = duckdb.connect(str(DB_PATH))
-                break
-            except duckdb.IOException as e:
-                if time.monotonic() >= deadline:
-                    holder = _find_lock_holder()
-                    raise duckdb.IOException(
-                        f"Could not acquire DuckDB lock after {LOCK_TIMEOUT}s. "
-                        f"Lock held by: {holder}. "
-                        f"Kill that process or wait for it to finish.\n"
-                        f"Original error: {e}"
-                    ) from None
-                attempt += 1
-                wait = min(
-                    1.0, 0.2 * attempt
-                )  # backoff: 0.2, 0.4, 0.6, 0.8, 1.0, 1.0, ...
-                print(
-                    f"[db] Waiting for DuckDB lock ({_find_lock_holder()})... "
-                    f"retry in {wait:.1f}s",
-                    file=sys.stderr,
-                )
-                time.sleep(wait)
+def get_writer() -> duckdb.DuckDBPyConnection:
+    """Get the serialized writer connection for writes/DDL.
 
-        init_schema(_local.conn)
-    return _local.conn
+    All write operations should use this connection with _writer_lock held.
+    Only one writer exists per process.
+    """
+    global _writer_conn
+    if _writer_conn is None:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _writer_conn = _connect_with_retry()
+        init_schema(_writer_conn)
+    return _writer_conn
+
+
+def get_reader() -> duckdb.DuckDBPyConnection:
+    """Get a read-only connection for this thread.
+
+    Each thread gets its own reader connection for concurrent reads.
+    Readers do not block each other or the writer.
+    """
+    if not hasattr(_local, "reader"):
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _local.reader = _connect_with_retry()
+    return _local.reader
+
+
+def get_conn() -> duckdb.DuckDBPyConnection:
+    """Legacy API: returns reader connection by default.
+
+    Use get_writer() for writes or get_reader() explicitly for reads.
+    """
+    return get_reader()
+
+
+def _connect_with_retry() -> duckdb.DuckDBPyConnection:
+    """Connect to DuckDB with exponential backoff on lock contention."""
+    deadline = time.monotonic() + LOCK_TIMEOUT
+    attempt = 0
+    while True:
+        try:
+            return duckdb.connect(str(DB_PATH))
+        except duckdb.IOException as e:
+            if time.monotonic() >= deadline:
+                holder = _find_lock_holder()
+                raise duckdb.IOException(
+                    f"Could not acquire DuckDB lock after {LOCK_TIMEOUT}s. "
+                    f"Lock held by: {holder}. "
+                    f"Kill that process or wait for it to finish.\n"
+                    f"Original error: {e}"
+                ) from None
+            attempt += 1
+            wait = min(
+                1.0, 0.2 * attempt
+            )  # backoff: 0.2, 0.4, 0.6, 0.8, 1.0, 1.0, ...
+            print(
+                f"[db] Waiting for DuckDB lock ({_find_lock_holder()})... "
+                f"retry in {wait:.1f}s",
+                file=sys.stderr,
+            )
+            time.sleep(wait)
 
 
 def init_schema(conn: duckdb.DuckDBPyConnection):
@@ -228,6 +259,17 @@ def init_schema(conn: duckdb.DuckDBPyConnection):
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS skip_cache (
+            file_path VARCHAR PRIMARY KEY,
+            mtime DOUBLE,
+            error_type VARCHAR,
+            error_message TEXT,
+            skip_until TIMESTAMP,
+            cached_at TIMESTAMP DEFAULT current_timestamp
+        )
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS session_skills (
             session_id VARCHAR PRIMARY KEY,
             d1_level INTEGER DEFAULT 0,
@@ -293,3 +335,26 @@ def init_schema(conn: duckdb.DuckDBPyConnection):
             created_at TIMESTAMP DEFAULT current_timestamp
         )
     """)
+
+
+def execute_write(sql: str, params=None):
+    """Execute a write query with proper locking.
+
+    Use this for INSERT, UPDATE, DELETE, or DDL statements.
+    """
+    with _writer_lock:
+        writer = get_writer()
+        if params:
+            return writer.execute(sql, params)
+        return writer.execute(sql)
+
+
+def execute_read(sql: str, params=None):
+    """Execute a read query using a reader connection.
+
+    Use this for SELECT queries that don't modify data.
+    """
+    reader = get_reader()
+    if params:
+        return reader.execute(sql, params)
+    return reader.execute(sql)

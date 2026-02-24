@@ -63,7 +63,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='Claude Retro.app',
-    icon=None,
+    icon='icon.icns',
     bundle_identifier='com.claude-retro.app',
     info_plist={
         'CFBundleShortVersionString': '0.1.0',

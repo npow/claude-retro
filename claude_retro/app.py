@@ -18,9 +18,10 @@ def _find_free_port() -> int:
 
 def _needs_initial_ingest() -> bool:
     """Check if the DB has no sessions yet."""
-    from .db import get_conn
+    from .db import get_writer
 
-    conn = get_conn()
+    # Ensure schema is initialized by getting writer
+    conn = get_writer()
     count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
     return count == 0
 

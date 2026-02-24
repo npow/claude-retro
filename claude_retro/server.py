@@ -4,9 +4,12 @@ import json
 import sys
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, Response
 
 from .db import get_conn
+from .events import get_broadcaster, format_sse
+from .version import get_version_info
+from .export import generate_export_html
 
 if getattr(sys, "frozen", False):
     _static = str(Path(sys._MEIPASS) / "static")
@@ -31,6 +34,36 @@ def api_status():
     return jsonify(_worker.status)
 
 
+@app.route("/api/events")
+def api_events():
+    """Server-Sent Events (SSE) stream for real-time updates.
+
+    Streams status updates, progress events, and completion notifications
+    as they happen. Replaces the need for polling /api/status.
+    """
+
+    def generate():
+        broadcaster = get_broadcaster()
+        q = broadcaster.subscribe()
+        try:
+            # Send initial status
+            if _worker:
+                yield format_sse("status", _worker.status)
+
+            # Stream events as they arrive
+            while True:
+                try:
+                    event = q.get(timeout=30)  # 30s keepalive
+                    yield format_sse(event["event"], event["data"])
+                except Exception:
+                    # Timeout - send keepalive comment
+                    yield ": keepalive\n\n"
+        finally:
+            broadcaster.unsubscribe(q)
+
+    return Response(generate(), mimetype="text/event-stream")
+
+
 def _row_to_dict(row, columns):
     return {col: _serialize(val) for col, val in zip(columns, row)}
 
@@ -44,6 +77,26 @@ def _serialize(val):
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
+
+
+@app.route("/api/version")
+def api_version():
+    return jsonify(get_version_info())
+
+
+@app.route("/api/export")
+def api_export():
+    """Export verdict and prescriptions as standalone HTML."""
+    from datetime import datetime
+
+    html = generate_export_html()
+    filename = f"claude-retro-{datetime.now().strftime('%Y%m%d')}.html"
+
+    return Response(
+        html,
+        mimetype="text/html",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @app.route("/api/overview")

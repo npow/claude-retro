@@ -1562,7 +1562,10 @@ async function updateBackgroundStatus(status) {
 
     wasWorking = true;
   } else {
-    // Background work is done
+    // Background work is done - always update button state first
+    btn.disabled = false;
+    btn.textContent = 'Run LLM Judge';
+
     if (wasWorking) {
       // Was showing progress — reload data
       stepEl.textContent = 'Complete!';
@@ -1580,10 +1583,10 @@ async function updateBackgroundStatus(status) {
 
       setTimeout(() => { progressEl.style.display = 'none'; }, 2000);
       wasWorking = false;
+    } else {
+      // Worker was already idle when we connected - hide progress immediately
+      progressEl.style.display = 'none';
     }
-
-    btn.disabled = false;
-    btn.textContent = 'Run LLM Judge';
   }
 }
 

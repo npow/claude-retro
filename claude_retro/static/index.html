@@ -1513,6 +1513,7 @@ e - Export (coming soon)
 // SSE connection for real-time updates
 let eventSource = null;
 let wasWorking = false;
+let statusUpdateTimeout = null;
 
 function connectEventStream() {
   if (eventSource) {
@@ -1523,7 +1524,17 @@ function connectEventStream() {
 
   eventSource.addEventListener('status', (e) => {
     const status = JSON.parse(e.data);
-    updateBackgroundStatus(status);
+
+    // Debounce rapid status updates (but show immediately if judging)
+    if (status.state === 'judging' || status.total > 10) {
+      updateBackgroundStatus(status);
+    } else {
+      // For quick ingestion updates, debounce to avoid flicker
+      clearTimeout(statusUpdateTimeout);
+      statusUpdateTimeout = setTimeout(() => {
+        updateBackgroundStatus(status);
+      }, 500);
+    }
   });
 
   eventSource.onerror = (e) => {

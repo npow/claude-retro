@@ -1427,6 +1427,19 @@ async function init() {
 
   // Load version info
   loadVersionInfo();
+
+  // Check initial status in case worker already completed
+  setTimeout(async () => {
+    try {
+      const status = await api('/api/status');
+      if (status.ready) {
+        // Worker is idle, ensure data is loaded
+        await Promise.all([loadVerdict(), loadChangeCards(), loadSessions(false)]);
+      }
+    } catch (e) {
+      console.error('Failed to check initial status:', e);
+    }
+  }, 1000);
 }
 
 async function loadVersionInfo() {

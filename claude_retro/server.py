@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory, Response
 
 from .config import CLAUDE_PROJECTS_DIR
-from .db import get_conn
+from .db import get_conn, get_writer
 from .version import get_version_info
 from .export import generate_export_html
 
@@ -17,6 +17,10 @@ else:
     _static = str(Path(__file__).parent / "static")
 
 app = Flask(__name__, static_folder=_static)
+
+# Ensure schema exists at import time so the app works even when started
+# via `flask run` rather than `python -m claude_retro`.
+get_writer()
 
 # Set by app.py / __main__.py so /api/status can read worker state
 _worker = None

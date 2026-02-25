@@ -6,4 +6,7 @@ dist/
 .DS_Store
 *.duckdb
 *.duckdb.wal
+*.db
+*.bak
+*.bak2
 .pytest_cache/

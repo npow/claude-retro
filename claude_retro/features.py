@@ -345,7 +345,7 @@ def _extract_session_features(session_id: str, conn):
     conn.execute(
         """
         INSERT OR REPLACE INTO session_features VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     """,
         [
@@ -379,5 +379,9 @@ def _extract_session_features(session_id: str, conn):
             branch_switch_count,
             prompt_oscillation,
             api_errors,
+            0,  # subagent_spawn_count
+            0,  # subagent_tool_diversity
+            0,  # subagent_error_rate
+            0,  # bash_heartbeat_count
         ],
     )

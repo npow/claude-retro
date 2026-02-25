@@ -6,6 +6,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory, Response
 
+from .config import CLAUDE_PROJECTS_DIR
 from .db import get_conn
 from .version import get_version_info
 from .export import generate_export_html
@@ -87,8 +88,12 @@ def api_overview():
             COUNT(DISTINCT project_name) as total_projects,
             AVG(turn_count) as avg_turns,
             SUM(user_prompt_count + assistant_msg_count) as total_messages,
-            COUNT(DISTINCT DATE(started_at)) as active_days
-        FROM sessions
+            COUNT(DISTINCT DATE(started_at)) as active_days,
+            SUM(s.tool_use_count) as total_tool_calls,
+            COALESCE(SUM(f.total_input_tokens), 0) as total_input_tokens,
+            COALESCE(SUM(f.total_output_tokens), 0) as total_output_tokens
+        FROM sessions s
+        LEFT JOIN session_features f ON s.session_id = f.session_id
         {_filter}
     """).fetchone()
 
@@ -151,6 +156,15 @@ def api_overview():
             "top_project_pct": round(top_proj[1] / total_sessions, 2) if top_proj and total_sessions else 0,
             "trajectory_distribution": {t: c for t, c in trajectory_dist},
             "baselines": [_row_to_dict(b, baseline_cols) for b in baselines],
+            "total_tool_calls": int(stats[9] or 0),
+            "total_input_tokens": int(stats[10] or 0),
+            "total_output_tokens": int(stats[11] or 0),
+            # Estimated cost: Sonnet 3.5/3.7 pricing ($3/MTok in, $15/MTok out)
+            "estimated_cost_usd": round(
+                (stats[10] or 0) / 1_000_000 * 3.0
+                + (stats[11] or 0) / 1_000_000 * 15.0,
+                2,
+            ),
         }
     )
 
@@ -311,6 +325,7 @@ def api_session_detail(session_id):
             "misalignments",
             "corrections",
             "waste_breakdown",
+            "friction_categories",
         ):
             if jd.get(field) and isinstance(jd[field], str):
                 try:
@@ -318,8 +333,18 @@ def api_session_detail(session_id):
                 except (json.JSONDecodeError, ValueError):
                     pass
         result["judgment"] = jd
+        # Include narrative fields at top level for easy access
+        result["narrative"] = {
+            "narrative": jd.get("narrative"),
+            "what_worked": jd.get("what_worked"),
+            "what_failed": jd.get("what_failed"),
+            "user_quote": jd.get("user_quote"),
+            "claude_md_suggestion": jd.get("claude_md_suggestion"),
+            "claude_md_rationale": jd.get("claude_md_rationale"),
+        }
     else:
         result["judgment"] = None
+        result["narrative"] = None
 
     return jsonify(result)
 
@@ -328,12 +353,17 @@ def api_session_detail(session_id):
 def api_session_timeline(session_id):
     conn = get_conn()
 
+    full = request.args.get("full", "0") == "1"
+    text_col = "user_text" if full else "SUBSTR(user_text, 1, 200)"
+    content_col = "text_content" if full else "SUBSTR(text_content, 1, 200)"
+
     entries = conn.execute(
-        """
+        f"""
         SELECT entry_id, entry_type, timestamp_utc, user_text_length,
                text_length, tool_names, is_tool_result, tool_result_error,
                system_subtype, duration_ms,
-               CASE WHEN user_text_length > 0 THEN SUBSTR(user_text, 1, 200) ELSE SUBSTR(text_content, 1, 200) END as preview
+               CASE WHEN user_text_length > 0 THEN {text_col} ELSE {content_col} END as preview,
+               CASE WHEN user_text_length > 0 THEN {text_col} ELSE NULL END as user_text
         FROM raw_entries
         WHERE session_id = ? AND NOT is_sidechain
         ORDER BY timestamp_utc
@@ -353,6 +383,7 @@ def api_session_timeline(session_id):
         "system_subtype",
         "duration_ms",
         "preview",
+        "user_text",
     ]
 
     return jsonify(
@@ -360,6 +391,92 @@ def api_session_timeline(session_id):
             "timeline": [_row_to_dict(e, cols) for e in entries],
         }
     )
+
+
+@app.route("/api/sessions/<session_id>/rich-timeline")
+def api_session_rich_timeline(session_id):
+    """Read JSONL directly to return full tool inputs + result content."""
+    conn = get_conn()
+
+    row = conn.execute(
+        "SELECT project_name FROM sessions WHERE session_id = ?", [session_id]
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Session not found", "timeline": []}), 404
+
+    project_name = row[0]
+    jsonl_path = CLAUDE_PROJECTS_DIR / project_name / f"{session_id}.jsonl"
+
+    if not jsonl_path.exists():
+        return jsonify({"error": "JSONL not found", "timeline": []}), 404
+
+    MAX = 400
+    turns = []
+
+    with open(jsonl_path, "r", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            entry_type = d.get("type")
+            if entry_type not in ("user", "assistant", "system"):
+                continue
+            if d.get("isSidechain"):
+                continue
+
+            msg = d.get("message", {})
+            content = msg.get("content", "")
+
+            turn = {
+                "type": entry_type,
+                "timestamp": d.get("timestamp", ""),
+                "text": "",
+                "tools": [],
+                "is_tool_result": False,
+                "is_error": False,
+                "tool_id": None,
+                "result_preview": None,
+                "system_subtype": d.get("subtype"),
+                "duration_ms": d.get("durationMs", 0),
+            }
+
+            if isinstance(content, str):
+                turn["text"] = content[:MAX]
+            elif isinstance(content, list):
+                text_parts = []
+                for block in content:
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        text_parts.append(block.get("text", ""))
+                    elif btype == "tool_use":
+                        inp = block.get("input", {})
+                        inp_str = json.dumps(inp, ensure_ascii=False)
+                        turn["tools"].append({
+                            "name": block.get("name", ""),
+                            "id": block.get("id", ""),
+                            "input_preview": inp_str[:MAX],
+                        })
+                    elif btype == "tool_result":
+                        turn["is_tool_result"] = True
+                        turn["is_error"] = bool(block.get("is_error", False))
+                        turn["tool_id"] = block.get("tool_use_id", "")
+                        rc = block.get("content", "")
+                        if isinstance(rc, list):
+                            rc = " ".join(
+                                b.get("text", "") for b in rc if b.get("type") == "text"
+                            )
+                        turn["result_preview"] = str(rc)[:MAX] if rc else None
+                if text_parts:
+                    turn["text"] = "\n".join(text_parts)[:MAX]
+
+            turns.append(turn)
+
+    return jsonify({"timeline": turns})
 
 
 @app.route("/api/intents")
@@ -425,6 +542,94 @@ def api_trends():
             "trends": [_row_to_dict(r, cols) for r in rows],
         }
     )
+
+
+@app.route("/api/search")
+def api_search():
+    """Full-text search across all messages using FTS5."""
+    conn = get_conn()
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 30)), 100)
+    project = request.args.get("project")
+
+    if not q or len(q) < 2:
+        return jsonify({"results": [], "query": q})
+
+    # Escape FTS5 special characters and wrap in quotes for phrase matching
+    fts_query = q.replace('"', '""')
+    if " " in fts_query:
+        fts_query = f'"{fts_query}"'
+
+    try:
+        params = [fts_query]
+        project_filter = ""
+        if project:
+            project_filter = "AND s.project_name = ?"
+            params.append(project)
+        params.append(limit)
+
+        rows = conn.execute(f"""
+            SELECT
+                messages_fts.session_id,
+                messages_fts.entry_type,
+                s.project_name,
+                s.first_prompt,
+                s.started_at,
+                snippet(messages_fts, 0, '<mark>', '</mark>', '...', 40) as snippet,
+                s.started_at as timestamp_utc
+            FROM messages_fts
+            JOIN sessions s ON messages_fts.session_id = s.session_id
+            WHERE messages_fts MATCH ?
+              {project_filter}
+            ORDER BY rank
+            LIMIT ?
+        """, params).fetchall()
+    except Exception:
+        # FTS query failed — fall back to LIKE search
+        like_q = f"%{q}%"
+        params = [like_q, like_q]
+        project_filter = ""
+        if project:
+            project_filter = "AND s.project_name = ?"
+            params.append(project)
+        params.append(limit)
+
+        rows = conn.execute(f"""
+            SELECT
+                r.session_id,
+                r.entry_type,
+                s.project_name,
+                s.first_prompt,
+                s.started_at,
+                SUBSTR(COALESCE(r.user_text, r.text_content, ''), 1, 200) as snippet,
+                r.timestamp_utc
+            FROM raw_entries r
+            JOIN sessions s ON r.session_id = s.session_id
+            WHERE (r.user_text LIKE ? OR r.text_content LIKE ?)
+              {project_filter}
+            ORDER BY r.timestamp_utc DESC
+            LIMIT ?
+        """, params).fetchall()
+
+    results = []
+    seen_sessions = set()
+    for row in rows:
+        sid = row[0]
+        # Deduplicate by session (show max 2 results per session)
+        count = sum(1 for r in results if r["session_id"] == sid)
+        if count >= 2:
+            continue
+        results.append({
+            "session_id": sid,
+            "entry_type": row[1],
+            "project": row[2],
+            "first_prompt": (row[3] or "")[:80],
+            "started_at": _serialize(row[4]),
+            "snippet": row[5],
+            "timestamp": _serialize(row[6]),
+        })
+
+    return jsonify({"results": results, "query": q})
 
 
 @app.route("/api/actions")
@@ -1037,9 +1242,11 @@ def api_skill_dimensions_detail():
         opp_col = f"d{num}_opportunity"
         examples = conn.execute(f"""
             SELECT sk.session_id, sk.{level_col}, sk.{opp_col},
-                   s.first_prompt, s.started_at
+                   s.first_prompt, s.started_at, s.duration_seconds,
+                   s.project_name, j.outcome, j.productivity_ratio
             FROM session_skills sk
             JOIN sessions s ON sk.session_id = s.session_id
+            LEFT JOIN session_judgments j ON sk.session_id = j.session_id
             WHERE (sk.{level_col} >= 2 OR sk.{opp_col} > sk.{level_col})
               AND s.turn_count >= 1
               AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
@@ -1048,17 +1255,22 @@ def api_skill_dimensions_detail():
         """).fetchall()
 
         example_sessions = []
-        for sid, lv, opp, prompt, started in examples:
+        for sid, lv, opp, prompt, started, dur, project, outcome, prod in examples:
             label = f"L{lv}"
             if opp > lv:
                 label += f" (could be L{opp})"
+            short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
             example_sessions.append({
                 "session_id": sid,
                 "level": lv,
                 "opportunity": opp,
                 "label": label,
                 "first_prompt": (prompt or "")[:80],
-                "started_at": started,
+                "started_at": _serialize(started),
+                "duration": dur,
+                "project": short_project,
+                "outcome": outcome,
+                "productivity": prod,
             })
 
         results.append({
@@ -1075,6 +1287,217 @@ def api_skill_dimensions_detail():
         })
 
     return jsonify({"dimensions": results})
+
+
+@app.route("/api/synthesis")
+def api_synthesis():
+    """Return the cross-session synthesis report."""
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM synthesis WHERE id = 1").fetchone()
+    if not row:
+        return jsonify({"synthesis": None})
+
+    cols = [d[0] for d in conn.execute("SELECT * FROM synthesis WHERE id = 1").description]
+    result = _row_to_dict(row, cols)
+
+    # Parse JSON fields
+    for field in ("at_a_glance", "top_wins", "top_friction", "claude_md_additions",
+                  "workflow_prompts", "features_to_try"):
+        if result.get(field) and isinstance(result[field], str):
+            try:
+                result[field] = json.loads(result[field])
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+    return jsonify({"synthesis": result})
+
+
+@app.route("/api/sessions/<session_id>/narrative")
+def api_session_narrative(session_id):
+    """Return the rich narrative for a session."""
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT narrative, what_worked, what_failed, user_quote,
+                  claude_md_suggestion, claude_md_rationale, prompt_summary
+           FROM session_judgments WHERE session_id = ?""",
+        [session_id],
+    ).fetchone()
+
+    if not row:
+        return jsonify({"narrative": None})
+
+    return jsonify({
+        "narrative": {
+            "narrative": row[0],
+            "what_worked": row[1],
+            "what_failed": row[2],
+            "user_quote": row[3],
+            "claude_md_suggestion": row[4],
+            "claude_md_rationale": row[5],
+            "prompt_summary": row[6],
+        }
+    })
+
+
+@app.route("/api/claude-md-suggestions")
+def api_claude_md_suggestions():
+    """Return all CLAUDE.md suggestions with copy-ready text."""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT j.session_id, j.claude_md_suggestion, j.claude_md_rationale,
+               j.prompt_summary, s.project_name, s.started_at
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.claude_md_suggestion IS NOT NULL AND j.claude_md_suggestion != ''
+        ORDER BY s.started_at DESC
+    """).fetchall()
+
+    # Also include synthesis-level suggestions
+    synthesis_suggestions = []
+    synth = conn.execute(
+        "SELECT claude_md_additions FROM synthesis WHERE id = 1"
+    ).fetchone()
+    if synth and synth[0]:
+        try:
+            additions = json.loads(synth[0]) if isinstance(synth[0], str) else synth[0]
+            for a in additions:
+                synthesis_suggestions.append({
+                    "rule": a.get("rule", ""),
+                    "rationale": a.get("rationale", ""),
+                    "evidence": a.get("evidence", ""),
+                    "source": "synthesis",
+                })
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    session_suggestions = []
+    for r in rows:
+        session_suggestions.append({
+            "session_id": r[0],
+            "rule": r[1],
+            "rationale": r[2],
+            "prompt_summary": r[3],
+            "project_name": r[4],
+            "started_at": _serialize(r[5]),
+            "source": "session",
+        })
+
+    return jsonify({
+        "synthesis_suggestions": synthesis_suggestions,
+        "session_suggestions": session_suggestions,
+    })
+
+
+@app.route("/api/session-highlights")
+def api_session_highlights():
+    """Return top noteworthy sessions with their narratives."""
+    conn = get_conn()
+
+    _filter = """
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+          AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
+    """
+
+    highlights = []
+
+    # Most productive session
+    row = conn.execute(f"""
+        SELECT j.session_id, j.productivity_ratio, j.outcome, j.narrative,
+               j.prompt_summary, s.project_name, s.started_at, s.duration_seconds,
+               j.what_worked
+        FROM session_judgments j {_filter}
+          AND j.outcome = 'completed'
+        ORDER BY j.productivity_ratio DESC LIMIT 1
+    """).fetchone()
+    if row:
+        highlights.append({
+            "type": "most_productive",
+            "label": "Most Productive",
+            "session_id": row[0], "productivity": row[1], "outcome": row[2],
+            "narrative": row[3], "prompt_summary": row[4],
+            "project": row[5], "started_at": _serialize(row[6]),
+            "duration": row[7], "what_worked": row[8],
+        })
+
+    # Most wasteful session
+    row = conn.execute(f"""
+        SELECT j.session_id, j.productivity_ratio, j.outcome, j.narrative,
+               j.prompt_summary, s.project_name, s.started_at, s.duration_seconds,
+               j.what_failed, j.misalignment_count
+        FROM session_judgments j {_filter}
+          AND j.waste_turns > 0
+        ORDER BY j.waste_turns DESC LIMIT 1
+    """).fetchone()
+    if row:
+        highlights.append({
+            "type": "most_wasteful",
+            "label": "Most Wasteful",
+            "session_id": row[0], "productivity": row[1], "outcome": row[2],
+            "narrative": row[3], "prompt_summary": row[4],
+            "project": row[5], "started_at": _serialize(row[6]),
+            "duration": row[7], "what_failed": row[8], "misalignments": row[9],
+        })
+
+    # Most misaligned session
+    row = conn.execute(f"""
+        SELECT j.session_id, j.misalignment_count, j.outcome, j.narrative,
+               j.prompt_summary, s.project_name, s.started_at, s.duration_seconds,
+               j.what_failed
+        FROM session_judgments j {_filter}
+          AND j.misalignment_count > 0
+        ORDER BY j.misalignment_count DESC LIMIT 1
+    """).fetchone()
+    if row and (not highlights or row[0] != highlights[-1].get("session_id")):
+        highlights.append({
+            "type": "most_misaligned",
+            "label": "Most Misaligned",
+            "session_id": row[0], "misalignments": row[1], "outcome": row[2],
+            "narrative": row[3], "prompt_summary": row[4],
+            "project": row[5], "started_at": _serialize(row[6]),
+            "duration": row[7], "what_failed": row[8],
+        })
+
+    # Best prompt quality
+    row = conn.execute(f"""
+        SELECT j.session_id, j.prompt_clarity, j.prompt_completeness, j.outcome,
+               j.narrative, j.prompt_summary, s.project_name, s.started_at,
+               j.what_worked
+        FROM session_judgments j {_filter}
+          AND j.prompt_clarity >= 0.8 AND j.prompt_completeness >= 0.8
+          AND j.outcome = 'completed'
+        ORDER BY (j.prompt_clarity + j.prompt_completeness) DESC LIMIT 1
+    """).fetchone()
+    if row:
+        highlights.append({
+            "type": "best_prompt",
+            "label": "Best Prompt",
+            "session_id": row[0], "clarity": row[1], "completeness": row[2],
+            "outcome": row[3], "narrative": row[4], "prompt_summary": row[5],
+            "project": row[6], "started_at": _serialize(row[7]),
+            "what_worked": row[8],
+        })
+
+    # Longest successful session
+    row = conn.execute(f"""
+        SELECT j.session_id, s.duration_seconds, j.outcome, j.narrative,
+               j.prompt_summary, s.project_name, s.started_at, s.turn_count,
+               j.what_worked
+        FROM session_judgments j {_filter}
+          AND j.outcome = 'completed'
+        ORDER BY s.duration_seconds DESC LIMIT 1
+    """).fetchone()
+    if row and (not highlights or row[0] != highlights[0].get("session_id")):
+        highlights.append({
+            "type": "longest_success",
+            "label": "Longest Success",
+            "session_id": row[0], "duration": row[1], "outcome": row[2],
+            "narrative": row[3], "prompt_summary": row[4],
+            "project": row[5], "started_at": _serialize(row[6]),
+            "turns": row[7], "what_worked": row[8],
+        })
+
+    return jsonify({"highlights": highlights[:5]})
 
 
 @app.route("/api/heatmap")

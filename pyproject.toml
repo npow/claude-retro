@@ -3,8 +3,13 @@ name = "claude-retro"
 version = "0.1.0"
 description = "Sprint retro for your Claude Code sessions"
 license = "MIT"
-requires-python = ">=3.10"
-dependencies = ["anthropic>=0.40.0", "flask>=2.0.0", "pywebview>=5.0"]
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "flask>=2.0.0",
+    "pywebview>=5.0",
+    "agenttrace @ git+https://github.com/npow/agenttrace.git#subdirectory=packages/agenttrace",
+]
 
 [project.optional-dependencies]
 build = ["pyinstaller>=6.0"]

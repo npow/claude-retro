@@ -132,7 +132,7 @@ class IngestionWorker(threading.Thread):
         from .baselines import compute_baselines
         from .prescriptions import generate_prescriptions
 
-        n = 9
+        n = 10
         self._set_status("Ingesting JSONL files", 1, n)
         run_ingest()
         self._set_status("Building sessions", 2, n)
@@ -151,6 +151,9 @@ class IngestionWorker(threading.Thread):
         compute_baselines()
         self._set_status("Generating prescriptions", 9, n)
         generate_prescriptions()
+        self._set_status("Building search index", 10, n)
+        from .db import rebuild_fts_index
+        rebuild_fts_index()
         self._set_idle()
 
     def _run_full_refresh(self, concurrency: int = 12):

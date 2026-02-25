@@ -1,28 +1,73 @@
-"""Shared fixtures for tests — uses an in-memory DuckDB so nothing touches the real DB."""
+"""Shared fixtures for tests — uses a temp SQLite DB for isolation."""
 
+import json
+import os
 import pytest
 
+import agenttrace.db as _at_db
+import agenttrace.config as _at_cfg
+import claude_retro.config as _cr_cfg
 from claude_retro import db
 
 
 @pytest.fixture(autouse=True)
 def isolated_db(monkeypatch, tmp_path):
     """Redirect all DB access to a temp file for test isolation."""
-    test_db = tmp_path / "test.duckdb"
+    test_db = tmp_path / "test.sqlite"
+
+    # Set env var so both agenttrace.config and claude_retro.config use the test DB.
+    monkeypatch.setenv("CLAUDE_RETRO_DB", str(test_db))
+
+    # Patch DB_PATH everywhere it is referenced.
+    # agenttrace.db._connect() looks up DB_PATH in agenttrace.db's own namespace,
+    # so we must patch that module-level name directly.
+    monkeypatch.setattr(_at_db, "DB_PATH", test_db)
+    monkeypatch.setattr(_at_cfg, "DB_PATH", test_db)
+    monkeypatch.setattr(_cr_cfg, "DB_PATH", test_db)
     monkeypatch.setattr(db, "DB_PATH", test_db)
-    # Clear thread-local connection cache so each test gets a fresh connection
-    if hasattr(db._local, "conn"):
-        del db._local.conn
+
+    # Reset the writer connection so the next get_writer() creates a fresh one
+    # pointing at the test DB.
+    old_writer = _at_db._writer_conn
+    _at_db._writer_conn = None
+
+    # Reset claude_retro.db extra-schema flag so it re-runs on new connection.
+    import claude_retro.db as _cr_db
+    _cr_db._extra_initialized = False
+
+    # Reset thread-local reader connection
+    if hasattr(_at_db._local, "reader"):
+        try:
+            _at_db._local.reader.close()
+        except Exception:
+            pass
+        del _at_db._local.reader
+
     yield test_db
-    if hasattr(db._local, "conn"):
-        db._local.conn.close()
-        del db._local.conn
+
+    # Teardown: restore original writer, close test connections
+    try:
+        test_conn = _at_db._writer_conn
+        if test_conn is not None:
+            test_conn.close()
+    except Exception:
+        pass
+
+    _at_db._writer_conn = old_writer
+    _cr_db._extra_initialized = False
+
+    if hasattr(_at_db._local, "reader"):
+        try:
+            _at_db._local.reader.close()
+        except Exception:
+            pass
+        del _at_db._local.reader
 
 
 @pytest.fixture
 def conn(isolated_db):
-    """Return a DuckDB connection with schema initialized."""
-    return db.get_conn()
+    """Return a SQLite connection with full schema initialized."""
+    return db.get_writer()
 
 
 @pytest.fixture
@@ -35,198 +80,78 @@ def seed_entries(conn):
     entries = [
         # Session A: 3 entries (user prompt, assistant tools, user prompt)
         (
-            "e1",
-            "sess-a",
-            "proj-x",
-            "user",
-            base,
-            None,
-            False,
-            "Implement auth flow",
-            20,
-            False,
-            False,
-            None,
-            [],
-            [],
-            "",
-            0,
-            0,
-            0,
-            None,
-            0,
-            None,
-            None,
+            "e1", "sess-a", "proj-x", "user", base,
+            None, False, "Implement auth flow", 20,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, None, 0, None, None,
         ),
         (
-            "e2",
-            "sess-a",
-            "proj-x",
-            "assistant",
-            base + timedelta(seconds=10),
-            None,
-            False,
-            None,
-            0,
-            False,
-            False,
-            "claude-sonnet",
-            [],
-            ["Edit", "Write"],
-            "done",
-            100,
-            500,
-            200,
-            None,
-            0,
-            None,
-            None,
+            "e2", "sess-a", "proj-x", "assistant", base + timedelta(seconds=10),
+            None, False, None, 0,
+            False, False, "claude-sonnet",
+            json.dumps([]), json.dumps(["Edit", "Write"]),
+            "done", 100, 500, 200, None, 0, None, None,
         ),
         (
-            "e3",
-            "sess-a",
-            "proj-x",
-            "user",
-            base + timedelta(seconds=30),
-            None,
-            False,
-            "Actually use JWT not sessions",
-            30,
-            False,
-            False,
-            None,
-            [],
-            [],
-            "",
-            0,
-            0,
-            0,
-            None,
-            0,
-            None,
-            None,
+            "e3", "sess-a", "proj-x", "user", base + timedelta(seconds=30),
+            None, False, "Actually use JWT not sessions", 30,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, None, 0, None, None,
         ),
         # Session B: 4 entries (user, assistant with error, tool result error, user correction)
         (
-            "e4",
-            "sess-b",
-            "proj-y",
-            "user",
-            base + timedelta(minutes=5),
-            None,
-            False,
-            "Fix the deploy bug",
-            18,
-            False,
-            False,
-            None,
-            [],
-            [],
-            "",
-            0,
-            0,
-            0,
-            None,
-            0,
-            None,
-            None,
+            "e4", "sess-b", "proj-y", "user", base + timedelta(minutes=5),
+            None, False, "Fix the deploy bug", 18,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, None, 0, None, None,
         ),
         (
-            "e5",
-            "sess-b",
-            "proj-y",
-            "assistant",
-            base + timedelta(minutes=5, seconds=10),
-            None,
-            False,
-            None,
-            0,
-            False,
-            False,
-            "claude-sonnet",
-            [],
-            ["Bash", "Read"],
-            "running",
-            50,
-            300,
-            100,
-            None,
-            0,
-            None,
-            None,
+            "e5", "sess-b", "proj-y", "assistant", base + timedelta(minutes=5, seconds=10),
+            None, False, None, 0,
+            False, False, "claude-sonnet",
+            json.dumps([]), json.dumps(["Bash", "Read"]),
+            "running", 50, 300, 100, None, 0, None, None,
         ),
         (
-            "e6",
-            "sess-b",
-            "proj-y",
-            "user",
-            base + timedelta(minutes=5, seconds=15),
-            None,
-            False,
-            None,
-            0,
-            True,
-            True,
-            None,
-            [],
-            [],
-            "",
-            0,
-            0,
-            0,
-            None,
-            0,
-            None,
-            None,
+            "e6", "sess-b", "proj-y", "user", base + timedelta(minutes=5, seconds=15),
+            None, False, None, 0,
+            True, True, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, None, 0, None, None,
         ),
         (
-            "e7",
-            "sess-b",
-            "proj-y",
-            "user",
-            base + timedelta(minutes=5, seconds=30),
-            None,
-            False,
-            "Wrong file, try src/deploy.py",
-            28,
-            False,
-            False,
-            None,
-            [],
-            [],
-            "",
-            0,
-            0,
-            0,
-            None,
-            0,
-            None,
-            None,
+            "e7", "sess-b", "proj-y", "user", base + timedelta(minutes=5, seconds=30),
+            None, False, "Wrong file, try src/deploy.py", 28,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, None, 0, None, None,
+        ),
+        # Session A: system turn_duration entry (so turn_count >= 1 filter passes)
+        (
+            "e_sys_a", "sess-a", "proj-x", "system", base + timedelta(seconds=40),
+            None, False, None, 0,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, "turn_duration", 5000, None, None,
+        ),
+        # Session B: system turn_duration entry
+        (
+            "e_sys_b", "sess-b", "proj-y", "system", base + timedelta(minutes=5, seconds=40),
+            None, False, None, 0,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, "turn_duration", 3000, None, None,
         ),
         # Session C: single entry (should be excluded from sessions, HAVING COUNT >= 2)
         (
-            "e8",
-            "sess-c",
-            "proj-x",
-            "user",
-            base + timedelta(minutes=10),
-            None,
-            False,
-            "Hello",
-            5,
-            False,
-            False,
-            None,
-            [],
-            [],
-            "",
-            0,
-            0,
-            0,
-            None,
-            0,
-            None,
-            None,
+            "e8", "sess-c", "proj-x", "user", base + timedelta(minutes=10),
+            None, False, "Hello", 5,
+            False, False, None,
+            json.dumps([]), json.dumps([]),
+            "", 0, 0, 0, None, 0, None, None,
         ),
     ]
 
@@ -244,4 +169,5 @@ def seed_entries(conn):
             list(e),
         )
 
+    conn.commit()
     return conn

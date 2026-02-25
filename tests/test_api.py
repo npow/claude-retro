@@ -47,6 +47,7 @@ class TestSessionsAPI:
                 productive_turns, waste_turns, misalignment_count
             ) VALUES ('sess-a', 'completed', 0.8, 4, 1, 0)
         """)
+        conn.commit()  # SQLite readers need explicit commit to see writer data
 
         resp = client.get("/api/sessions?limit=10&sort=started_at+ASC")
         data = resp.get_json()
@@ -83,12 +84,13 @@ class TestJudgmentStatsAPI:
                 productive_turns, waste_turns, misalignment_count
             ) VALUES ('sess-a', 'completed', 0.9, 9, 1, 0)
         """)
+        conn.commit()  # SQLite readers need explicit commit to see writer data
 
         resp = client.get("/api/judgments/stats")
         data = resp.get_json()
-        # The orphan is included because we don't filter — this test documents
-        # current behavior. The cleanup should happen at ingest time, not query time.
-        assert data["total_judged"] == 2
+        # The endpoint JOINs to sessions, so orphaned judgments (no matching session)
+        # are excluded. Only sess-a judgment counts.
+        assert data["total_judged"] == 1
 
 
 class TestOverviewAPI:

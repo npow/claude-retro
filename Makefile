@@ -12,7 +12,7 @@ build:
 	./build_macos.sh
 	@echo "Done! Output: dist/Claude Retro.app"
 
-## Install from source
+## Install from source (uses agenttrace from GitHub)
 install:
 	@echo "Installing claude-retro..."
 	pip install -e .
@@ -22,6 +22,12 @@ install:
 install-build:
 	@echo "Installing with build dependencies..."
 	pip install -e ".[build]"
+	@echo "Done!"
+
+## Install using a local agenttrace checkout (for development)
+install-dev:
+	@echo "Installing claude-retro with local agenttrace..."
+	pip install -e ../agenttrace/packages/agenttrace -e .
 	@echo "Done!"
 
 ## Run in development mode (browser)

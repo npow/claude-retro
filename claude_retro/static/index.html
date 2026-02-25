@@ -4,56 +4,95 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Retro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
+/* Dark theme (default) — matches agentsview */
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface2: #242836;
-  --border: #2e3347;
-  --text: #e4e4e7;
-  --text-dim: #8b8fa3;
-  --accent: #6366f1;
-  --accent2: #818cf8;
-  --green: #22c55e;
-  --yellow: #eab308;
-  --red: #ef4444;
-  --orange: #f97316;
-  --blue: #3b82f6;
-  --purple: #a855f7;
-  --cyan: #06b6d4;
-  --radius: 10px;
+  --bg: #0d0d12;
+  --surface: #16161e;
+  --surface2: #1f1f2a;
+  --inset: #111116;
+  --border: #2b2b38;
+  --border-muted: #232330;
+  --text: #e4e6eb;
+  --text-sec: #9ea5b4;
+  --text-dim: #6c7385;
+  --accent: #60a5fa;
+  --accent2: #a78bfa;
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --orange: #fb923c;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+  --amber: #d97706;
+  --radius: 6px;
   --overlay: rgba(0,0,0,0.6);
-  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow: 0 2px 8px rgba(0,0,0,0.35);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.35);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+  --user-bg: #111827;
+  --assistant-bg: #141220;
+  --tool-bg: #1a1508;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
 }
+/* Light theme */
 [data-theme="light"] {
-  --bg: #f8f9fa;
+  --bg: #f5f6f8;
   --surface: #ffffff;
-  --surface2: #f0f1f3;
-  --border: #d1d5db;
-  --text: #1f2937;
-  --text-dim: #6b7280;
-  --accent: #6366f1;
-  --accent2: #4f46e5;
-  --green: #16a34a;
+  --surface2: #f0f1f4;
+  --inset: #ecedf2;
+  --border: #d8dae2;
+  --border-muted: #e4e6ec;
+  --text: #181b24;
+  --text-sec: #555b6e;
+  --text-dim: #878ea0;
+  --accent: #2563eb;
+  --accent2: #7c3aed;
+  --green: #059669;
   --yellow: #ca8a04;
   --red: #dc2626;
   --orange: #ea580c;
   --blue: #2563eb;
-  --purple: #9333ea;
+  --purple: #7c3aed;
   --cyan: #0891b2;
-  --overlay: rgba(0,0,0,0.35);
-  --shadow: 0 2px 8px rgba(0,0,0,0.1);
+  --amber: #d97706;
+  --overlay: rgba(0,0,0,0.3);
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.1);
+  --user-bg: #eef2ff;
+  --assistant-bg: #faf9ff;
+  --tool-bg: #fffbf0;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  font-size: 13px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01'; text-rendering: optimizeLegibility;
   background: var(--bg); color: var(--text);
   min-height: 100vh;
   transition: background-color 0.3s, color 0.3s;
 }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-a { color: var(--accent2); text-decoration: none; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+::selection { background: var(--accent); color: white; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+input, select { font: inherit; color: inherit; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
 
 /* Loading spinner */
 .loading {
@@ -71,122 +110,216 @@ a { color: var(--accent2); text-decoration: none; }
   to { transform: rotate(360deg); }
 }
 
-/* Single-column layout */
-.page { max-width: 860px; margin: 0 auto; padding: 24px 20px 80px; }
+/* Full-width layout */
+.page { max-width: none; margin: 0; padding: 16px 32px 80px; }
 
-/* Top bar */
+/* Top bar — matches agentsview header */
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 32px; padding-bottom: 16px; border-bottom: 3px solid var(--border);
-  position: relative;
+  margin-bottom: 16px; padding: 0 0 10px; border-bottom: 1px solid var(--border);
+  position: relative; gap: 10px;
 }
-.top-bar h1 { font-size: 18px; font-weight: 700; color: var(--accent2); }
+.top-bar h1 { font-size: 12px; font-weight: 650; color: var(--text); letter-spacing: -0.01em; white-space: nowrap; }
 .top-bar h1 span { color: var(--text-dim); font-weight: 400; }
 .refresh-btn {
-  background: var(--accent); border: none; border-radius: 6px; color: white;
-  padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 500;
+  height: 26px; padding: 0 10px; border-radius: 4px; font-size: 11px;
+  font-weight: 500; cursor: pointer; white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  transition: background 0.1s, color 0.1s;
 }
-.refresh-btn:hover { background: var(--accent2); }
+.refresh-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ===== THE VERDICT ===== */
 .verdict {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 28px 32px; margin-bottom: 32px; transition: background-color 0.3s, border-color 0.3s;
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  padding: 12px; margin-bottom: 16px;
 }
 .verdict-summary {
-  font-size: 20px; font-weight: 600; line-height: 1.5; margin-bottom: 16px;
-  color: var(--text);
+  font-size: 14px; font-weight: 500; line-height: 1.6; margin-bottom: 10px;
+  color: var(--text-sec);
 }
-.verdict-summary strong { color: var(--accent2); }
-.verdict-bar-wrap { margin-bottom: 12px; }
+.verdict-summary strong { color: var(--text); font-weight: 600; }
+.verdict-bar-wrap { margin-bottom: 6px; }
 .verdict-bar {
-  height: 24px; border-radius: 6px; overflow: hidden; display: flex;
-  background: var(--surface2);
+  height: 8px; border-radius: 4px; overflow: hidden; display: flex;
+  background: var(--inset);
 }
 .verdict-bar .productive { background: var(--green); transition: width 0.4s; }
-.verdict-bar .waste { background: var(--red); opacity: 0.6; transition: width 0.4s; }
+.verdict-bar .waste { background: var(--red); opacity: 0.5; transition: width 0.4s; }
 .verdict-bar-labels {
-  display: flex; justify-content: space-between; font-size: 12px;
-  color: var(--text-dim); margin-top: 4px;
+  display: flex; justify-content: space-between; font-size: 10px;
+  color: var(--text-dim); margin-top: 3px;
 }
-.verdict-stats {
-  display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim);
+/* Stat cards — exact agentsview SummaryCards pattern */
+.stat-cards {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
 }
-.verdict-stats .vs { display: flex; align-items: baseline; gap: 6px; padding-right: 16px; border-right: 1px solid var(--border); }
-.verdict-stats .vs:last-child { border-right: none; padding-right: 0; }
-.verdict-stats .vs strong { font-size: 18px; font-weight: 700; color: var(--text); }
+.stat-card {
+  flex: 1; min-width: 120px; padding: 12px;
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.stat-card .stat-value { font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--text); }
+.stat-card .stat-label { font-size: 11px; font-weight: 500; color: var(--text-dim); }
+.stat-card .stat-sub { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
 /* ===== CHANGE THESE 3 THINGS ===== */
 .section-label {
-  font-size: 12px; color: var(--text-dim); text-transform: uppercase;
-  letter-spacing: 0.8px; font-weight: 600; margin-bottom: 12px;
+  font-size: 10px; color: var(--text-dim); font-weight: 600; margin-bottom: 8px;
+  text-transform: uppercase; letter-spacing: 0.02em;
 }
+/* ===== CHANGE CARDS — redesigned ===== */
 .change-cards {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px; margin-bottom: 36px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px; margin-bottom: 16px; align-items: start;
 }
-.change-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px 18px; border-left: 3px solid var(--accent); transition: background-color 0.3s, border-color 0.3s;
+.cc-card {
+  background: var(--surface); border: 1px solid var(--border-muted);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column;
 }
-.change-card .change-num {
-  font-size: 11px; font-weight: 700; color: var(--accent2);
-  text-transform: uppercase; margin-bottom: 6px;
+.cc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px 8px; border-bottom: 1px solid var(--border-muted);
+  gap: 8px;
 }
-.change-card .change-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.change-card .change-body { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 6px; }
-.change-card .change-link {
-  font-size: 12px; color: var(--accent2); cursor: pointer;
+.cc-project {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: 6px; min-width: 0;
 }
-.change-card .change-link:hover { text-decoration: underline; }
+.cc-project-icon { font-size: 13px; flex-shrink: 0; }
+.cc-num {
+  font-size: 9px; font-weight: 700; color: var(--text-dim);
+  letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0;
+}
+/* Metrics row — 2-3 widgets side by side */
+.cc-metrics {
+  display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr);
+  gap: 1px; background: var(--border-muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+.cc-metric {
+  background: var(--surface); padding: 10px 12px 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.cc-metric-val {
+  font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -0.02em;
+}
+.cc-metric-delta {
+  font-size: 10px; font-weight: 600; opacity: 0.75;
+  margin-left: 3px; vertical-align: text-bottom;
+}
+.cc-metric-label {
+  font-size: 9px; font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px;
+}
+.cc-metric-bar {
+  height: 4px; background: var(--inset); border-radius: 2px; margin-top: 7px;
+  position: relative; overflow: visible;
+}
+.cc-metric-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+/* avg tick — a taller notch that pokes above/below the bar */
+.cc-metric-bar-tick {
+  position: absolute; top: -3px;
+  width: 2px; height: 10px;
+  background: var(--text-dim); border-radius: 1px;
+  transform: translateX(-50%);
+  opacity: 0.6;
+}
+/* Advice zone */
+.cc-advice {
+  padding: 9px 12px; font-size: 11px; color: var(--text-sec);
+  line-height: 1.55; flex: 1;
+}
+.cc-advice-label {
+  font-size: 9px; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+}
+/* CTA footer */
+.cc-footer {
+  padding: 8px 12px; border-top: 1px solid var(--border-muted);
+  background: var(--inset);
+}
+.cc-cta {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 0;
+}
+.cc-cta:hover { text-decoration: underline; }
+/* Plain text cards (non-project) */
+.cc-plain-body {
+  padding: 10px 12px; font-size: 11px; color: var(--text-dim); line-height: 1.55; flex: 1;
+}
+.cc-plain-link {
+  font-size: 11px; color: var(--text-dim); padding: 0 12px 10px;
+}
 
 /* ===== SESSION FEED ===== */
 .feed-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 8px; gap: 6px;
 }
 .filter-bar {
-  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  display: flex; gap: 6px; align-items: center; flex: 1;
 }
-.filter-bar select, .filter-bar input {
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-  color: var(--text); padding: 6px 10px; font-size: 12px; outline: none;
+.filter-bar select {
+  height: 26px; padding: 0 8px;
+  background: var(--inset); border: 1px solid var(--border-muted); border-radius: 4px;
+  color: var(--text-sec); font-size: 11px; outline: none; cursor: pointer;
+  transition: border-color 0.15s; max-width: 200px;
 }
-.filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
+.filter-bar select:focus { outline: none; border-color: var(--accent); }
+/* Search input — agentsview search-hint style */
+.filter-bar input {
+  height: 26px; padding: 0 10px; margin-left: auto;
+  background: var(--inset); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  color: var(--text-sec); font-size: 11px; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.filter-bar input::placeholder { color: var(--text-dim); }
+.filter-bar input:focus { border-color: var(--border); box-shadow: var(--shadow-sm); }
+.filter-bar input:hover { border-color: var(--border); }
 
-.session-feed { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.session-feed { display: flex; flex-direction: column; gap: 0; }
 
-/* Session card — compact */
+/* Session card — agentsview SessionItem pattern */
 .s-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 12px 16px; cursor: pointer; transition: border-color 0.15s, background-color 0.3s;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.1s;
+  border-radius: 0;
 }
-.s-card:hover { border-color: var(--accent); }
-.s-card.expanded { border-color: var(--accent); cursor: default; }
-.s-row1 { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.s-card:hover { background: var(--surface2); }
+.s-card.expanded { background: var(--surface2); border-left-color: var(--accent); cursor: default; flex-wrap: wrap; align-items: flex-start; }
+.s-card .s-detail { width: 100%; margin-top: 0; }
+.s-row1 { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .s-outcome {
-  font-size: 14px; width: 20px; text-align: center; flex-shrink: 0;
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  font-size: 0; overflow: hidden;
 }
 .s-prompt {
-  flex: 1; font-size: 13px; color: var(--text); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; font-weight: 500;
+  flex: 1; font-size: 12px; color: var(--text); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; font-weight: 450; min-width: 0;
+  line-height: 1.3; letter-spacing: -0.005em;
 }
 .s-prod {
-  font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
-  white-space: nowrap; flex-shrink: 0;
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px;
+  white-space: nowrap; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.03em;
 }
 .s-row2 {
-  display: flex; align-items: center; gap: 10px; font-size: 12px;
-  color: var(--text-dim); padding-left: 30px;
+  display: flex; align-items: center; gap: 6px; font-size: 10px;
+  color: var(--text-dim); line-height: 1.3; letter-spacing: 0.01em;
 }
 .s-row2 .sep { color: var(--border); }
-/* Inline problem callout for failed/problematic sessions */
+/* Inline problem callout */
 .s-issue {
-  display: flex; align-items: center; gap: 6px; font-size: 12px;
-  color: var(--red); padding-left: 30px; margin-top: 4px;
+  display: flex; align-items: center; gap: 4px; font-size: 10px;
+  color: var(--red); margin-top: 1px;
 }
-.s-issue .issue-icon { opacity: 0.7; }
+.s-issue .issue-icon { opacity: 0.6; font-size: 10px; }
 
 /* Badges */
 .badge {
@@ -213,141 +346,202 @@ a { color: var(--accent2); text-decoration: none; }
 
 /* ===== EXPANDED SESSION DETAIL (in-place) ===== */
 .s-detail {
-  padding: 16px 16px 12px 30px; border-top: 1px solid var(--border);
-  margin-top: 10px; animation: fadeIn 0.15s ease;
+  padding: 12px 16px 10px; border-top: 1px solid var(--border-muted);
+  margin-top: 4px; animation: fadeIn 0.1s ease;
+  background: var(--surface);
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.s-detail .detail-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.s-detail .detail-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
 
-/* AI analysis in expanded card */
-.ai-section { margin-bottom: 14px; }
+/* AI analysis sections */
+.ai-section { margin-bottom: 10px; }
 .ai-section .ai-label {
-  font-size: 11px; color: var(--text-dim); text-transform: uppercase;
-  letter-spacing: 0.3px; margin-bottom: 4px; font-weight: 500;
+  font-size: 10px; color: var(--text-dim); font-weight: 600;
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.02em;
 }
-.ai-section .ai-body { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
-.ai-section .ai-body strong { color: var(--text); }
+.ai-section .ai-body { font-size: 12px; color: var(--text-sec); line-height: 1.65; }
+.ai-section .ai-body strong { color: var(--text); font-weight: 600; }
 
 /* Quality bars */
-.quality-bars { display: flex; gap: 20px; margin-bottom: 14px; }
+.quality-bars { display: flex; gap: 12px; margin-bottom: 10px; }
 .quality-bar { flex: 1; }
-.quality-bar .bar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
-.quality-bar .bar-track { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-.quality-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-.quality-bar .bar-value { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.quality-bar .bar-label { font-size: 10px; color: var(--text-dim); font-weight: 500; margin-bottom: 3px; }
+.quality-bar .bar-track { height: 4px; background: var(--inset); border-radius: 2px; overflow: hidden; }
+.quality-bar .bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.quality-bar .bar-value { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
-/* Tags */
-.tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
-.tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent2); }
-
-/* Issue items */
-.issue-list { margin-bottom: 12px; }
-.issue-item {
-  display: flex; gap: 8px; padding: 6px 8px; border-radius: 5px;
-  margin-bottom: 4px; font-size: 12px;
+/* Tags — micro pills */
+.tag-list { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 8px; }
+.tag {
+  display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 500;
+  background: var(--inset); border: 1px solid var(--border-muted); color: var(--text-sec);
 }
-.issue-item.misalignment { background: color-mix(in srgb, var(--red) 8%, transparent); border-left: 3px solid var(--red); }
-.issue-item.correction { background: color-mix(in srgb, var(--yellow) 8%, transparent); border-left: 3px solid var(--yellow); }
-.issue-item.underspec { background: color-mix(in srgb, var(--orange) 8%, transparent); border-left: 3px solid var(--orange); }
-.issue-item .turn-num { color: var(--text-dim); white-space: nowrap; font-weight: 600; }
-.issue-item .issue-desc { color: var(--text-dim); }
+
+/* Issue items — subtle: left border carries the role, background is barely tinted */
+.issue-list { margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
+.issue-item {
+  display: flex; gap: 8px; padding: 6px 10px; border-radius: 0 4px 4px 0;
+  font-size: 12px; border-left: 3px solid var(--border);
+  background: transparent; transition: background 0.1s;
+}
+.issue-item:hover { background: var(--surface2); }
+.issue-item.misalignment { border-left-color: var(--red); }
+.issue-item.correction { border-left-color: var(--yellow); }
+.issue-item.underspec { border-left-color: var(--orange); }
+.issue-item .turn-num {
+  color: var(--text-dim); white-space: nowrap; font-weight: 600; font-size: 10px;
+  min-width: 44px; flex-shrink: 0;
+}
+.issue-item .issue-desc { color: var(--text-dim); line-height: 1.5; }
 .issue-item .issue-context {
-  margin-top: 4px; padding: 6px 8px; border-radius: 4px;
-  font-size: 11px; line-height: 1.4; max-height: 60px; overflow: hidden;
+  margin-top: 4px; padding: 5px 8px; border-radius: 3px;
+  font-size: 11px; line-height: 1.4; max-height: 56px; overflow: hidden;
   white-space: pre-wrap; word-break: break-word;
 }
 .issue-item .issue-context.ctx-user {
-  background: color-mix(in srgb, var(--accent) 8%, transparent); border-left: 2px solid var(--accent); color: var(--accent2);
+  background: color-mix(in srgb, var(--accent) 6%, transparent); border-left: 2px solid var(--accent); color: var(--accent2);
 }
 .issue-item .issue-context.ctx-assistant {
-  background: color-mix(in srgb, var(--green) 6%, transparent); border-left: 2px solid var(--green); color: var(--text-dim);
+  background: color-mix(in srgb, var(--green) 5%, transparent); border-left: 2px solid var(--green); color: var(--text-dim);
 }
 
 /* Productivity bar */
-.prod-bar-wrap { margin-bottom: 12px; }
-.prod-bar-track { height: 16px; background: var(--surface2); border-radius: 5px; overflow: hidden; display: flex; }
+.prod-bar-wrap { margin-bottom: 8px; }
+.prod-bar-track { height: 6px; background: var(--inset); border-radius: 3px; overflow: hidden; display: flex; }
 .prod-bar-track .productive { background: var(--green); }
-.prod-bar-track .waste { background: var(--red); opacity: 0.6; }
-.prod-bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.prod-bar-track .waste { background: var(--red); opacity: 0.5; }
+.prod-bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
 /* Tool usage bar chart */
-.tool-chart-wrap { margin-bottom: 12px; }
-.tool-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; font-size: 12px; }
-.tool-bar-name { width: 90px; text-align: right; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
-.tool-bar-track { flex: 1; height: 14px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.tool-chart-wrap { margin-bottom: 8px; }
+.tool-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.tool-bar-name {
+  width: 90px; text-align: right; color: var(--text-dim); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0;
+  font-family: var(--font-mono); font-size: 10px;
+}
+.tool-bar-track { flex: 1; height: 6px; background: var(--inset); border-radius: 3px; overflow: hidden; }
 .tool-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
-.tool-bar-count { width: 30px; font-size: 11px; color: var(--text-dim); }
+.tool-bar-count { width: 28px; font-size: 10px; color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Collapsible timeline */
+/* Collapsible timeline — uses msg-entry style */
 .timeline-toggle {
-  font-size: 12px; color: var(--accent2); cursor: pointer; margin-bottom: 8px;
-  display: inline-block;
+  font-size: 11px; color: var(--text-dim); cursor: pointer; margin-bottom: 6px;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 4px;
+  transition: background 0.1s, color 0.1s;
+  border: 1px solid var(--border-muted); background: var(--inset);
 }
-.timeline-toggle:hover { text-decoration: underline; }
-.timeline-content { display: none; max-height: 300px; overflow-y: auto; }
+.timeline-toggle:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+.timeline-content { display: none; max-height: 400px; overflow-y: auto; padding: 4px 0; }
 .timeline-content.open { display: block; }
-.timeline-entry {
-  display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border);
-  font-size: 11px;
+/* Timeline message entries — same visual language as modal */
+.tl-msg {
+  border-left: 3px solid var(--border-muted); padding: 6px 10px; margin-bottom: 2px;
+  border-radius: 0 4px 4px 0; font-size: 11px; transition: background 0.1s;
 }
-.timeline-entry .te-type { width: 70px; flex-shrink: 0; }
-.timeline-entry .te-time { width: 80px; flex-shrink: 0; color: var(--text-dim); }
-.timeline-entry .te-detail { color: var(--text-dim); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-msg:hover { background: var(--surface2); }
+.tl-msg.tl-user { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.tl-msg.tl-assistant { border-left-color: var(--accent2); background: color-mix(in srgb, var(--accent2) 3%, transparent); }
+.tl-msg.tl-system { border-left-color: var(--text-dim); }
+.tl-msg .tl-header { display: flex; align-items: center; gap: 6px; }
+.tl-msg .tl-role { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.tl-msg .tl-role.r-user { color: var(--accent); }
+.tl-msg .tl-role.r-assistant { color: var(--accent2); }
+.tl-msg .tl-role.r-system { color: var(--text-dim); }
+.tl-msg .tl-time { font-size: 9px; color: var(--text-dim); margin-left: auto; font-variant-numeric: tabular-nums; }
+.tl-msg .tl-preview { color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-msg .tl-tools { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.tl-tool-call { border-left: 2px solid var(--border-muted); padding-left: 8px; }
+.tl-tool-name {
+  font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  background: var(--inset); border: 1px solid var(--border-muted); color: var(--text-sec);
+  display: inline-block; margin-bottom: 2px;
+}
+.tl-tool-input { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
+.tl-tool-result { font-size: 10px; margin-top: 2px; padding: 2px 6px; border-radius: 3px; background: color-mix(in srgb, var(--green) 8%, transparent); color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
+.tl-tool-result.tl-result-err { background: color-mix(in srgb, var(--red) 8%, transparent); color: var(--red); }
 
 /* Load more */
 .load-more {
-  text-align: center; padding: 12px; font-size: 13px; color: var(--accent2);
-  cursor: pointer;
+  text-align: center; padding: 8px; cursor: pointer;
 }
-.load-more:hover { text-decoration: underline; }
+.load-more span {
+  display: inline-block; height: 26px; padding: 0 12px; border-radius: 4px;
+  font-size: 11px; font-weight: 500; color: var(--text-dim); line-height: 26px;
+  border: 1px solid var(--border-muted); transition: background 0.1s, color 0.1s;
+}
+.load-more:hover span { background: var(--surface2); color: var(--text); }
 
-/* ===== TABS ===== */
+/* ===== TABS — agentsview nav-btn style ===== */
 .tab-bar {
-  display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  display: flex; gap: 2px; margin-bottom: 12px; padding: 4px 0;
 }
 .tab-btn {
-  padding: 10px 20px; font-size: 13px; font-weight: 500; color: var(--text-dim);
-  cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent;
-  transition: all 0.15s;
+  height: 26px; padding: 0 10px; border-radius: 4px;
+  font-size: 11px; font-weight: 500; color: var(--text-dim);
+  cursor: pointer; border: none; background: none; white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
 }
-.tab-btn:hover { color: var(--text); }
-.tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent); }
+.tab-btn:hover { background: var(--surface2); color: var(--text); }
+.tab-btn.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* Chart containers */
-.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; margin-bottom: 20px; }
+/* Chart containers — agentsview chart-panel */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+@media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
 .chart-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px; transition: background-color 0.3s, border-color 0.3s;
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  padding: 12px; min-height: 200px; display: flex; flex-direction: column;
 }
-.chart-card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
-.chart-wrap { position: relative; height: 240px; }
+.chart-card h3 { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.chart-wrap { position: relative; height: 240px; flex: 1; }
+
+/* Session tree */
+.st-project { background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius); margin-bottom: 4px; overflow: hidden; }
+.st-proj-header { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; transition: background 0.1s; }
+.st-proj-header:hover { background: var(--surface2); }
+.st-caret { font-size: 8px; color: var(--text-dim); transition: transform 0.2s; flex-shrink: 0; width: 10px; }
+.st-project.open .st-caret { transform: rotate(90deg); }
+.st-proj-name { font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.st-proj-meta { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+.st-proj-stats { display: flex; align-items: center; gap: 5px; margin-left: auto; flex-wrap: wrap; }
+.st-stat { font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 3px; background: var(--surface2); color: var(--text-sec); }
+.st-sessions { border-top: 1px solid var(--border-muted); }
+.st-sessions .s-card { border-radius: 0; border: none; border-bottom: 1px solid var(--border-muted); }
+.st-sessions .s-card:last-child { border-bottom: none; }
+.st-more { padding: 8px 12px 8px 24px; font-size: 11px; color: var(--accent); cursor: pointer; border-top: 1px solid var(--border-muted); }
+.st-more:hover { background: var(--surface2); }
+.skill-legend-row { padding: 1px 3px; border-radius: 3px; transition: background 0.1s; }
+.skill-legend-row:hover { background: var(--surface2); }
+.skill-legend-nudge { display: none; font-size: 10px; color: var(--text-dim); padding: 3px 13px 2px; line-height: 1.4; }
+.skill-legend-row.open .skill-legend-nudge { display: block; }
 
 /* Project health table */
 .health-table-wrap {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px; margin-bottom: 20px;
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  padding: 12px; margin-bottom: 16px;
 }
-.health-table-wrap h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.health-table-wrap h3 { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: color 0.15s, background 0.15s; }
+th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--border-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.02em; cursor: pointer; transition: color 0.1s, background 0.1s; }
 th:hover { color: var(--text); background: var(--surface2); }
-td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+td { padding: 6px 10px; border-bottom: 1px solid var(--border-muted); font-size: 11px; }
 tr:hover td { background: var(--surface2); }
 .row-amber td { background: color-mix(in srgb, var(--yellow) 6%, transparent); }
 .row-red td { background: color-mix(in srgb, var(--red) 6%, transparent); }
 
 /* Heatmap (7x24 grid) */
-.heatmap { display: grid; grid-template-columns: auto repeat(24, 1fr); gap: 2px; font-size: 11px; }
-.heatmap-label { padding: 4px 8px; color: var(--text-dim); text-align: right; }
+.heatmap { display: grid; grid-template-columns: auto repeat(24, 13px); gap: 2px; font-size: 11px; width: fit-content; }
+.heatmap-label { padding: 2px 8px 2px 0; color: var(--text-dim); text-align: right; font-size: 10px; line-height: 13px; }
 .heatmap-cell {
-  aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center;
-  justify-content: center; font-size: 10px; color: transparent; transition: all 0.15s;
+  width: 13px; height: 13px; border-radius: 2px; display: flex; align-items: center;
+  justify-content: center; font-size: 9px; color: transparent; transition: all 0.15s;
 }
 .heatmap-cell:hover { color: var(--text); transform: scale(1.2); }
-.heatmap-header { text-align: center; color: var(--text-dim); padding: 2px; }
+.heatmap-header { width: 13px; text-align: center; color: var(--text-dim); font-size: 9px; padding: 1px 0; }
 
 /* GitHub-style calendar heatmap */
 .cal-heatmap { overflow-x: auto; }
@@ -366,33 +560,37 @@ tr:hover td { background: var(--surface2); }
 .cal-legend-cell { width: 10px; height: 10px; border-radius: 2px; }
 
 /* ===== SKILLS TAB ===== */
-.radar-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px; margin-bottom: 20px;
+/* Skill bar chart */
+.skill-bars-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 12px;
 }
-.radar-card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
-.radar-wrap { position: relative; height: 320px; max-width: 400px; margin: 0 auto; }
-
-.skill-dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 20px; }
-.skill-dim-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+.skill-bars-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+.skill-bars-summary { font-size: 12px; color: var(--text-dim); }
+.skill-bar-row {
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  border-left: 3px solid transparent; padding: 10px 14px;
+  margin-bottom: 4px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
 }
-.skill-dim-header { display: flex; align-items: center; justify-content: space-between; }
-.skill-dim-name { font-size: 13px; font-weight: 600; }
-.skill-dim-levels { display: flex; gap: 3px; align-items: center; }
-.skill-dim-levels .level-dot {
-  width: 18px; height: 6px; border-radius: 3px; background: var(--surface2);
+.skill-bar-row:hover { background: var(--surface2); }
+.skill-bar-header { display: flex; align-items: center; gap: 12px; }
+.skill-bar-name { width: 190px; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.skill-bar-track {
+  flex: 1; height: 8px; background: var(--surface2); border-radius: 4px;
+  position: relative; overflow: hidden;
 }
-.skill-dim-levels .level-dot.filled { background: var(--accent); }
-.skill-dim-levels .level-dot.opportunity { background: var(--yellow); opacity: 0.5; }
-.skill-dim-gap {
-  font-size: 11px; color: var(--text-dim); line-height: 1.4;
+.skill-bar-fill { height: 100%; border-radius: 4px; position: absolute; left: 0; top: 0; transition: width 0.5s ease; }
+.skill-bar-ticks { position: absolute; inset: 0; display: flex; pointer-events: none; }
+.skill-bar-ticks span {
+  flex: 1; border-right: 1px solid var(--bg); opacity: 0.4;
 }
-.skill-dim-card { cursor: pointer; transition: border-color 0.2s; }
-.skill-dim-card:hover { border-color: var(--accent); }
-.skill-dim-detail { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-.skill-dim-card.expanded .skill-dim-detail { display: block; }
+.skill-bar-ticks span:last-child { border-right: none; }
+.skill-bar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-width: 90px; justify-content: flex-end; }
+.skill-bar-level { font-size: 12px; font-weight: 700; }
+.skill-bar-score { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.skill-bar-gap { font-size: 10px; color: var(--yellow); font-weight: 600; }
+.skill-bar-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.skill-bar-row.expanded .skill-bar-detail { display: block; }
 .skill-dim-nudge { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin-bottom: 6px; }
 .skill-dim-nudge strong { color: var(--yellow); font-weight: 600; }
 .skill-dim-examples { font-size: 11px; }
@@ -410,26 +608,84 @@ tr:hover td { background: var(--surface2); }
 }
 .session-modal-backdrop.active { display: flex; }
 .session-modal {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
   width: 90vw; max-width: 800px; max-height: 85vh; overflow-y: auto;
-  padding: 20px 24px; position: relative;
+  padding: 0; position: relative;
+  box-shadow: var(--shadow-lg);
 }
 .session-modal-close {
-  position: absolute; top: 12px; right: 16px; background: none; border: none;
-  color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 4px 8px;
+  position: absolute; top: 8px; right: 10px; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); font-size: 16px; border-radius: 4px;
+  transition: background 0.1s, color 0.1s; z-index: 1;
 }
-.session-modal-close:hover { color: var(--text); }
-.session-modal h3 { margin: 0 0 12px; font-size: 15px; }
-.session-modal .timeline-entry { font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
-.session-modal .tl-type { font-weight: 600; margin-right: 6px; }
-.session-modal .tl-tools { color: var(--accent); font-size: 11px; }
-.session-modal .tl-text { color: var(--text-dim); margin-top: 2px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
-.session-modal .tl-error { color: var(--red); }
+.session-modal-close:hover { color: var(--text); background: var(--surface2); }
+.session-modal h3 { font-size: 13px; font-weight: 600; line-height: 1.4; margin: 0; }
+.session-modal .modal-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border-muted);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.session-modal .modal-meta {
+  font-size: 10px; color: var(--text-dim);
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.session-modal .modal-meta .sep { color: var(--border); }
+.session-modal .modal-judgment {
+  margin: 0; padding: 10px 16px; background: var(--surface);
+  border-bottom: 1px solid var(--border-muted);
+  font-size: 12px; color: var(--text-sec);
+}
+.session-modal .modal-judgment strong { font-weight: 600; color: var(--text); }
+.session-modal .modal-judgment .judge-summary { color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
+.session-modal .modal-body { padding: 8px 0; }
+.session-modal .modal-section-label {
+  font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.02em; padding: 8px 16px 4px;
+}
+/* Message entries — agentsview MessageContent pattern: 4px left border, role bg, role icon */
+.session-modal .msg-entry {
+  border-left: 4px solid var(--border); padding: 14px 20px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 0 8px 4px 8px;
+}
+.session-modal .msg-entry.msg-user { border-left-color: var(--accent); background: var(--user-bg); }
+.session-modal .msg-entry.msg-assistant { border-left-color: var(--accent2); background: var(--assistant-bg); }
+.session-modal .msg-entry.msg-tool { border-left-color: var(--amber); background: var(--tool-bg); }
+.session-modal .msg-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.session-modal .msg-role-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: white; flex-shrink: 0; line-height: 1;
+}
+.session-modal .msg-role {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+}
+.session-modal .msg-role.role-user { color: var(--accent); }
+.session-modal .msg-role.role-assistant { color: var(--accent2); }
+.session-modal .msg-turn { font-size: 12px; color: var(--text-dim); margin-left: auto; }
+.session-modal .msg-tools {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-top: 4px;
+  display: flex; flex-wrap: wrap; gap: 3px;
+}
+.session-modal .msg-tools span {
+  display: inline-block; padding: 2px 6px; border-radius: 4px;
+  background: var(--inset); border: 1px solid var(--border-muted); color: var(--text-sec);
+}
+.session-modal .msg-text {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  white-space: pre-wrap; max-height: 200px; overflow-y: auto;
+  word-break: break-word;
+}
+.session-modal .msg-error {
+  font-size: 11px; color: var(--red); font-weight: 500; margin-top: 4px;
+}
 
-.nudge-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.nudge-cards { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .nudge-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 12px 14px; border-left: 3px solid var(--yellow);
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  padding: 10px 12px; border-left: 3px solid var(--yellow);
 }
 .nudge-card .nudge-header {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
@@ -459,13 +715,349 @@ tr:hover td { background: var(--surface2); }
 /* Empty state */
 .empty-state { text-align: center; padding: 32px; color: var(--text-dim); font-size: 14px; }
 
-/* Footer */
-.footer {
-  margin-top: 40px; padding: 16px 0; border-top: 1px solid var(--border);
-  text-align: center; font-size: 11px; color: var(--text-dim);
+/* ===== SECTION NAV (jump links) ===== */
+.section-nav {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px;
+  padding: 6px 0; border-bottom: 1px solid var(--border-muted);
 }
-.footer a { color: var(--accent2); text-decoration: none; }
+.section-nav a {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.02em; padding: 3px 8px; border-radius: 4px;
+  color: var(--text-dim); text-decoration: none; transition: all 0.12s;
+  white-space: nowrap;
+}
+.section-nav a:hover { background: var(--surface2); color: var(--text); text-decoration: none; }
+.section-nav a.nav-active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* ===== NARRATIVE SECTIONS ===== */
+.narrative-section {
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  padding: 0; margin-bottom: 16px; overflow: hidden;
+}
+.narrative-section .ns-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; cursor: pointer; transition: background 0.1s;
+}
+.narrative-section .ns-header:hover { background: var(--surface2); }
+.narrative-section .ns-header h2 {
+  font-size: 12px; font-weight: 700; margin: 0;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.narrative-section .ns-toggle { color: var(--text-dim); font-size: 11px; transition: transform 0.2s; }
+.narrative-section .ns-body { padding: 0 16px 16px; }
+.narrative-section.collapsed .ns-body { display: none; }
+.narrative-section.collapsed .ns-toggle { transform: rotate(-90deg); }
+.narrative-section .prose {
+  font-size: 14px; line-height: 1.7; color: var(--text-sec);
+}
+.narrative-section .prose p { margin-bottom: 12px; }
+.narrative-section .prose strong { color: var(--text); font-weight: 600; }
+
+/* At a Glance — amber gradient */
+.at-a-glance {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--amber) 8%, var(--surface)), var(--surface));
+  border-color: color-mix(in srgb, var(--amber) 20%, var(--border-muted));
+}
+.at-a-glance .ns-header h2 { color: var(--amber); }
+.at-a-glance .glance-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
+}
+@media (max-width: 600px) { .at-a-glance .glance-grid { grid-template-columns: 1fr; } }
+.at-a-glance .glance-item h3 {
+  font-size: 11px; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 4px;
+}
+.at-a-glance .glance-item p {
+  font-size: 13px; color: var(--text-sec); line-height: 1.6;
+}
+
+/* Win/Friction cards */
+.win-card, .friction-card, .claude-md-card, .highlight-card {
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  padding: 12px 16px; margin-bottom: 8px;
+}
+.win-card { border-left: 3px solid var(--green); }
+.win-card h3 { font-size: 13px; font-weight: 600; color: var(--green); margin-bottom: 4px; }
+.win-card p { font-size: 12px; color: var(--text-sec); line-height: 1.6; }
+
+.friction-card { border-left: 3px solid var(--red); }
+.friction-card h3 { font-size: 13px; font-weight: 600; color: var(--red); margin-bottom: 4px; }
+.friction-card p { font-size: 12px; color: var(--text-sec); line-height: 1.6; }
+.friction-card .examples {
+  margin-top: 6px; font-size: 11px; color: var(--text-dim);
+  font-style: italic;
+}
+
+@media (max-width: 700px) {
+  #wins-friction-row > div { grid-template-columns: 1fr !important; }
+}
+
+.claude-md-card { border-left: 3px solid var(--blue); position: relative; }
+.claude-md-card h3 { font-size: 13px; font-weight: 600; color: var(--blue); margin-bottom: 4px; }
+.claude-md-card .rule-text {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text);
+  padding: 8px 10px; background: var(--inset); border-radius: 4px;
+  margin: 6px 0; line-height: 1.5; cursor: text;
+  user-select: all;
+}
+.claude-md-card .rationale { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+.claude-md-card .evidence { font-size: 10px; color: var(--text-dim); margin-top: 4px; font-style: italic; }
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 500;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--blue); border: 1px solid color-mix(in srgb, var(--blue) 25%, transparent);
+  cursor: pointer; transition: background 0.15s;
+}
+.copy-btn:hover { background: color-mix(in srgb, var(--blue) 20%, transparent); }
+.copy-btn.copied { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); border-color: color-mix(in srgb, var(--green) 25%, transparent); }
+
+/* Highlight cards grid */
+#highlights-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px; }
+#highlights-container .highlight-card { margin-bottom: 0; }
+#claude-md-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px; }
+#claude-md-container .claude-md-card { margin-bottom: 0; }
+
+/* Highlight cards */
+.highlight-card { border-left: 3px solid var(--purple); }
+.highlight-card .hl-type {
+  font-size: 9px; font-weight: 700; color: var(--purple);
+  text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;
+}
+.highlight-card h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.highlight-card .hl-narrative { font-size: 12px; color: var(--text-sec); line-height: 1.6; }
+.highlight-card .hl-meta { font-size: 10px; color: var(--text-dim); margin-top: 6px; }
+.highlight-card .hl-link {
+  font-size: 11px; color: var(--accent); cursor: pointer; margin-top: 4px;
+  display: inline-block;
+}
+.highlight-card .hl-link:hover { text-decoration: underline; }
+
+/* User quote */
+.user-quote {
+  border-left: 3px solid var(--accent2); padding: 8px 14px; margin: 8px 0;
+  background: color-mix(in srgb, var(--accent2) 5%, transparent);
+  font-size: 13px; font-style: italic; color: var(--text-sec); line-height: 1.6;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* Fun headline */
+.fun-headline {
+  text-align: center; padding: 20px; margin-bottom: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent2) 6%, var(--surface)), color-mix(in srgb, var(--accent) 6%, var(--surface)));
+  border: 1px solid var(--border-muted); border-radius: var(--radius);
+  font-size: 16px; font-weight: 600; color: var(--text); line-height: 1.4;
+}
+
+/* Collapsible panel */
+.collapsible-panel {
+  background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius);
+  margin-bottom: 16px; overflow: hidden;
+}
+.collapsible-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer; transition: background 0.1s;
+}
+.collapsible-header:hover { background: var(--surface2); }
+.collapsible-header h2 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--text-dim); margin: 0;
+}
+.collapsible-header .toggle-icon { color: var(--text-dim); font-size: 12px; transition: transform 0.2s; }
+.collapsible-body { display: none; }
+.collapsible-panel.open .collapsible-body { display: block; }
+.collapsible-panel.open .toggle-icon { transform: rotate(90deg); }
+
+/* Narrative in session detail */
+.s-detail .narrative-block { margin-bottom: 10px; }
+.s-detail .narrative-block .narrative-text {
+  font-size: 12px; color: var(--text-sec); line-height: 1.65;
+}
+.s-detail .worked-failed { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+@media (max-width: 600px) { .s-detail .worked-failed { grid-template-columns: 1fr; } }
+.s-detail .wf-card {
+  padding: 8px 10px; border-radius: 4px; font-size: 11px; line-height: 1.5;
+}
+.s-detail .wf-card.wf-good {
+  background: color-mix(in srgb, var(--green) 6%, transparent);
+  border-left: 2px solid var(--green); color: var(--text-sec);
+}
+.s-detail .wf-card.wf-bad {
+  background: color-mix(in srgb, var(--red) 6%, transparent);
+  border-left: 2px solid var(--red); color: var(--text-sec);
+}
+.s-detail .cmd-suggestion {
+  background: color-mix(in srgb, var(--blue) 6%, transparent);
+  border-left: 2px solid var(--blue); padding: 8px 10px; border-radius: 0 4px 4px 0;
+  margin-bottom: 10px; font-size: 11px;
+}
+.s-detail .cmd-suggestion .cmd-rule {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text); margin-bottom: 4px;
+}
+.s-detail .cmd-suggestion .cmd-rationale { color: var(--text-dim); line-height: 1.5; }
+
+/* ===== SEARCH RESULTS ===== */
+.search-panel {
+  position: fixed; top: auto; right: 16px; width: min(520px, calc(100vw - 32px));
+  max-height: 420px; overflow-y: auto; z-index: 200;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  display: none;
+}
+.search-panel.open { display: block; }
+.search-result {
+  display: flex; gap: 8px; padding: 8px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border-muted); transition: background 0.1s;
+  align-items: flex-start;
+}
+.search-result:last-child { border-bottom: none; }
+.search-result:hover { background: var(--surface2); }
+.search-result .sr-role {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: white;
+}
+.search-result .sr-body { flex: 1; min-width: 0; }
+.search-result .sr-snippet {
+  font-size: 12px; color: var(--text-sec); line-height: 1.5;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.search-result .sr-snippet mark {
+  background: color-mix(in srgb, var(--amber) 30%, transparent);
+  color: var(--text); border-radius: 2px; padding: 0 2px;
+}
+.search-result .sr-meta {
+  font-size: 10px; color: var(--text-dim); margin-top: 2px;
+}
+.search-empty { padding: 20px; text-align: center; color: var(--text-dim); font-size: 12px; }
+
+/* ===== IMPROVED MESSAGE RENDERER ===== */
+.msg-text code {
+  font-family: var(--font-mono); font-size: 0.85em;
+  background: var(--inset); border: 1px solid var(--border-muted);
+  border-radius: 4px; padding: 0.15em 0.4em;
+}
+.msg-text pre {
+  background: var(--inset); border: 1px solid var(--border-muted);
+  border-radius: 4px; padding: 10px 12px; margin: 8px 0;
+  overflow-x: auto; font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.5; color: var(--text);
+}
+.msg-text pre code {
+  background: none; border: none; padding: 0; font-size: inherit;
+}
+.msg-text strong { font-weight: 600; color: var(--text); }
+.msg-text em { font-style: italic; }
+.msg-text a { color: var(--accent); }
+.msg-text ul, .msg-text ol { margin: 6px 0 6px 20px; }
+.msg-text li { margin-bottom: 4px; }
+.msg-text h1, .msg-text h2, .msg-text h3 {
+  font-weight: 600; color: var(--text); margin: 12px 0 6px;
+}
+.msg-text h1 { font-size: 16px; }
+.msg-text h2 { font-size: 14px; }
+.msg-text h3 { font-size: 13px; }
+.msg-text blockquote {
+  border-left: 3px solid var(--border); padding: 4px 12px; margin: 6px 0;
+  color: var(--text-dim);
+}
+.msg-expand-btn {
+  font-size: 11px; color: var(--accent); cursor: pointer; margin-top: 4px;
+  display: inline-block;
+}
+.msg-expand-btn:hover { text-decoration: underline; }
+.msg-text.collapsed { max-height: 200px; overflow: hidden; position: relative; }
+.msg-text.collapsed::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 40px; background: linear-gradient(transparent, var(--bg));
+  pointer-events: none;
+}
+
+/* ===== SKILL EXAMPLE CARDS ===== */
+.skill-example-cards { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.skill-example-card {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  background: var(--inset); border-radius: 4px; cursor: pointer;
+  transition: background 0.1s; border: 1px solid transparent;
+}
+.skill-example-card:hover { background: var(--surface2); border-color: var(--border-muted); }
+.skill-example-card .ex-outcome {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.skill-example-card .ex-info { flex: 1; min-width: 0; }
+.skill-example-card .ex-prompt {
+  font-size: 11px; color: var(--text); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.skill-example-card .ex-meta {
+  font-size: 10px; color: var(--text-dim);
+}
+.skill-example-card .ex-level-badge {
+  font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* Footer — agentsview StatusBar style */
+.footer {
+  margin-top: 24px; padding: 8px 0; border-top: 1px solid var(--border);
+  text-align: center; font-size: 10px; color: var(--text-dim);
+  letter-spacing: 0.01em;
+}
+.footer a { color: var(--accent); text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
+
+/* ===== WORKFLOW PROMPTS ===== */
+.workflow-card {
+  background: var(--surface); border: 1px solid var(--border-muted);
+  border-left: 4px solid var(--accent); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 12px;
+}
+.workflow-card.wrong_approach { border-left-color: #ef4444; }
+.workflow-card.buggy_code { border-left-color: #f97316; }
+.workflow-card.tone_mismatch { border-left-color: #8b5cf6; }
+.workflow-card.scope_creep { border-left-color: #eab308; }
+.workflow-card.circular_debug { border-left-color: #ec4899; }
+.workflow-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.workflow-card-title { font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
+.workflow-friction-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--inset); color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.workflow-description { font-size: 13px; color: var(--text-sec); margin-bottom: 12px; }
+.workflow-paste-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.workflow-paste-box { background: var(--inset); border: 1px solid var(--border-muted); border-radius: 4px; padding: 12px; font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; line-height: 1.5; color: var(--text-sec); position: relative; }
+.workflow-copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 11px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; }
+.workflow-copy-btn:hover { opacity: 0.85; }
+
+/* ===== FEATURES TO TRY ===== */
+.feature-card {
+  background: var(--surface); border: 1px solid var(--border-muted);
+  border-left: 4px solid #22c55e; border-radius: var(--radius);
+  padding: 16px; margin-bottom: 12px;
+}
+.feature-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.feature-name { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #22c55e; }
+.feature-why { font-size: 13px; color: var(--text-sec); margin-bottom: 12px; }
+
+/* ===== FRICTION CATEGORY BAR ===== */
+.friction-cat-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.friction-cat-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--inset); border-radius: 4px; font-size: 12px; }
+.friction-cat-label { color: var(--text-dim); }
+.friction-cat-count { font-weight: 700; font-size: 14px; }
+.friction-cat-item.wrong_approach .friction-cat-count { color: #ef4444; }
+.friction-cat-item.buggy_code .friction-cat-count { color: #f97316; }
+.friction-cat-item.tone_mismatch .friction-cat-count { color: #8b5cf6; }
+.friction-cat-item.scope_creep .friction-cat-count { color: #eab308; }
+.friction-cat-item.circular_debug .friction-cat-count { color: #ec4899; }
+
+/* ===== FRICTION QUOTE ===== */
+.friction-quote {
+  border-left: 3px solid var(--accent); margin: 8px 0 0 0;
+  padding: 6px 12px; font-style: italic; font-size: 13px;
+  color: var(--text-dim); background: var(--inset);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ===== HIGHLIGHT COST ===== */
+.highlight-cost { font-size: 11px; background: #ef444420; color: #ef4444; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -474,30 +1066,29 @@ tr:hover td { background: var(--surface2); }
 
 <div class="page">
 
-  <!-- Top bar -->
+  <!-- Top bar — agentsview AppHeader pattern -->
   <div class="top-bar">
     <h1>Claude <span>Retro</span></h1>
-    <div style="display:flex;align-items:center;gap:8px">
-      <button id="theme-toggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 10px;font-size:14px;cursor:pointer;transition:background 0.2s,color 0.2s,border-color 0.3s;line-height:1" title="Toggle dark/light mode"></button>
-      <select id="concurrency-select" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 10px;font-size:12px;outline:none;" title="Parallelism">
-        <option value="4">4 parallel</option>
-        <option value="8">8 parallel</option>
-        <option value="12" selected>12 parallel</option>
-        <option value="16">16 parallel</option>
-        <option value="24">24 parallel</option>
+    <div style="display:flex;align-items:center;gap:2px;margin-left:auto">
+      <button id="theme-toggle" onclick="toggleTheme()" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--text-dim);font-size:14px;transition:background 0.12s,color 0.12s;line-height:1" title="Toggle theme"></button>
+      <select id="concurrency-select" style="height:26px;padding:0 8px;background:var(--inset);border:1px solid var(--border-muted);border-radius:4px;color:var(--text-sec);font-size:11px;outline:none;cursor:pointer;transition:border-color 0.15s" title="Parallelism">
+        <option value="4">4x</option>
+        <option value="8">8x</option>
+        <option value="12" selected>12x</option>
+        <option value="16">16x</option>
+        <option value="24">24x</option>
       </select>
-      <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">Run LLM Judge</button>
-      <a href="/api/export" download class="refresh-btn" style="background:var(--surface2);color:var(--text);text-decoration:none;display:inline-block;transition:background 0.2s">Export HTML</a>
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">Run Judge</button>
+      <a href="/api/export" download style="height:24px;padding:0 8px;border-radius:4px;font-size:11px;font-weight:500;color:var(--text-dim);text-decoration:none;display:inline-flex;align-items:center;transition:background 0.1s,color 0.1s" onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text-sec)'" onmouseout="this.style.background='';this.style.color='var(--text-dim)'">Export</a>
     </div>
-    <!-- Progress bar overlay (reuses the border, no layout shift) -->
-    <div id="refresh-bar" style="position:absolute;bottom:-3px;left:0;height:3px;width:0%;background:var(--accent);transition:width 0.3s"></div>
+    <div id="refresh-bar" style="position:absolute;bottom:-1px;left:0;height:2px;width:0%;background:var(--accent);transition:width 0.3s"></div>
   </div>
 
-  <!-- Progress status text (overlays on top-bar, no layout shift) -->
-  <div id="refresh-progress" style="display:none;position:fixed;top:10px;right:20px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--text-dim);z-index:1000;backdrop-filter:blur(10px);box-shadow:var(--shadow);transition:background-color 0.3s,border-color 0.3s">
-    <div style="display:flex;gap:12px;align-items:center">
+  <!-- Progress -->
+  <div id="refresh-progress" style="display:none;position:fixed;top:8px;right:16px;background:var(--surface);border:1px solid var(--border-muted);border-radius:var(--radius);padding:6px 10px;font-size:11px;color:var(--text-dim);z-index:1000;box-shadow:var(--shadow-md);transition:background-color 0.3s,border-color 0.3s">
+    <div style="display:flex;gap:8px;align-items:center">
       <span id="refresh-step"></span>
-      <span id="refresh-count" style="color:var(--accent2);font-weight:500"></span>
+      <span id="refresh-count" style="color:var(--accent);font-weight:500"></span>
     </div>
   </div>
 
@@ -506,26 +1097,136 @@ tr:hover td { background: var(--surface2); }
     <!-- Content loaded by JS -->
   </div>
 
-  <!-- 2. CHANGE THESE 3 THINGS -->
+  <!-- Section nav — jump links that appear when synthesis exists -->
+  <nav class="section-nav" id="section-nav" style="display:none">
+    <a href="#at-a-glance" onclick="scrollToSection(event,'at-a-glance')">Glance</a>
+    <a href="#changes-section" onclick="scrollToSection(event,'changes-section')">Actions</a>
+    <a href="#usage-narrative-section" onclick="scrollToSection(event,'usage-narrative-section')">Profile</a>
+    <a href="#wins-section" onclick="scrollToSection(event,'wins-section')">Wins</a>
+    <a href="#friction-section" onclick="scrollToSection(event,'friction-section')">Friction</a>
+    <a href="#claude-md-section" onclick="scrollToSection(event,'claude-md-section')">CLAUDE.md</a>
+    <a href="#workflow-prompts-section" onclick="scrollToSection(event,'workflow-prompts-section')">Workflow</a>
+    <a href="#features-section" onclick="scrollToSection(event,'features-section')">Features</a>
+    <a href="#highlights-section" onclick="scrollToSection(event,'highlights-section')">Highlights</a>
+    <a href="#activity-section" onclick="scrollToSection(event,'activity-section')">Activity</a>
+    <a href="#tab-sessions" onclick="scrollToSection(event,'tab-sessions');switchTab('sessions')">Sessions</a>
+  </nav>
+
+  <!-- Skill nudges (shown below verdict if any active nudges) -->
+  <div id="skill-nudges-section" style="display:none"></div>
+
+  <!-- 2. AT A GLANCE (from synthesis) — collapsible -->
+  <div class="narrative-section at-a-glance" id="at-a-glance" style="display:none">
+    <div class="ns-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <h2>At a Glance</h2>
+      <span class="ns-toggle">&#9660;</span>
+    </div>
+    <div class="ns-body">
+      <div class="glance-grid" id="glance-grid"></div>
+    </div>
+  </div>
+
+  <!-- 3. CHANGE THESE 3 THINGS -->
   <div id="changes-section" style="display:none">
     <div class="section-label">Change These 3 Things</div>
     <div class="change-cards" id="change-cards"></div>
   </div>
 
+  <!-- 4. USAGE NARRATIVE — starts expanded -->
+  <div class="narrative-section" id="usage-narrative-section" style="display:none">
+    <div class="ns-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <h2 style="color:var(--accent2)">How You Work</h2>
+      <span class="ns-toggle">&#9660;</span>
+    </div>
+    <div class="ns-body">
+      <div class="prose" id="usage-narrative"></div>
+    </div>
+  </div>
+
+  <!-- 5/6 WINS + FRICTION — side by side on wide screens -->
+  <div id="wins-friction-row" style="display:none;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div id="wins-section">
+        <div class="section-label" style="color:var(--green)">What Went Well</div>
+        <div id="wins-container"></div>
+      </div>
+      <div id="friction-section">
+        <div class="section-label" style="color:var(--red)">Top Friction Points</div>
+        <div id="friction-category-bar" class="friction-cat-bar"></div>
+        <div id="friction-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. CLAUDE.md SUGGESTIONS (auto-applied) -->
+  <div id="claude-md-section" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="section-label" style="color:var(--blue);margin-bottom:0">CLAUDE.md Suggestions</div>
+      <span id="claude-md-status" style="font-size:10px;color:var(--green);font-weight:500"></span>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">These rules are automatically added to each project's CLAUDE.md after judging.</div>
+    <div id="claude-md-container"></div>
+  </div>
+
+  <!-- 7b. WORKFLOW PROMPTS — paste-ready prompts for your friction patterns -->
+  <div id="workflow-prompts-section" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="section-label" style="color:var(--accent);margin-bottom:0">Paste Into Claude Code</div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Ready-to-use prompts that address your specific friction patterns. Paste directly into Claude Code, fill in the brackets.</p>
+    <div id="workflow-prompts-list"></div>
+  </div>
+
+  <!-- 7c. FEATURES TO TRY -->
+  <div id="features-section" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="section-label" style="color:#22c55e;margin-bottom:0">Features to Try</div>
+    </div>
+    <div id="features-list"></div>
+  </div>
+
+  <!-- 8. SESSION HIGHLIGHTS — starts collapsed -->
+  <div class="narrative-section collapsed" id="highlights-section" style="display:none">
+    <div class="ns-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <h2 style="color:var(--purple)">Session Highlights</h2>
+      <span class="ns-toggle">&#9660;</span>
+    </div>
+    <div class="ns-body" id="highlights-container"></div>
+  </div>
+
+  <!-- 9. FUN HEADLINE -->
+  <div class="fun-headline" id="fun-headline" style="display:none"></div>
+
+  <!-- 10. ACTIVITY CHARTS (always visible) -->
+  <div id="activity-section">
+    <div class="section-label">Activity</div>
+    <div style="display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; margin-bottom:12px">
+      <div class="chart-card">
+        <h3>Contribution Calendar</h3>
+        <div id="calendar-container" class="cal-heatmap"></div>
+      </div>
+      <div class="chart-card">
+        <h3>Activity by Day &amp; Hour</h3>
+        <div id="heatmap-container"></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:12px">
+      <h3>Productivity Trend</h3><div class="chart-wrap"><canvas id="chart-trends"></canvas></div>
+    </div>
+  </div>
+
   <!-- TAB BAR -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="sessions" onclick="switchTab('sessions')">Sessions</button>
-    <button class="tab-btn" data-tab="skills" onclick="switchTab('skills')">Skills</button>
-    <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')">Charts</button>
-    <button class="tab-btn" data-tab="projects" onclick="switchTab('projects')">Projects</button>
   </div>
 
   <!-- TAB: Sessions -->
   <div class="tab-content active" id="tab-sessions">
     <div class="feed-header">
       <div class="filter-bar">
-        <select id="filter-project"><option value="">All Projects</option></select>
-        <select id="filter-sort">
+        <!-- Hidden inputs kept for backward compat with existing filter logic -->
+        <select id="filter-project" style="display:none"><option value="">All Projects</option></select>
+        <select id="filter-sort" style="display:none">
           <option value="started_at DESC">Newest</option>
           <option value="started_at ASC">Oldest</option>
           <option value="productivity ASC">Lowest productivity</option>
@@ -533,59 +1234,29 @@ tr:hover td { background: var(--surface2); }
           <option value="duration DESC">Longest</option>
           <option value="turns DESC">Most turns</option>
         </select>
-        <input type="text" id="filter-search" placeholder="Search...">
+        <select id="tree-sort">
+          <option value="sessions">Sessions ↓</option>
+          <option value="productivity">Productivity ↓</option>
+          <option value="completion">Completion ↓</option>
+          <option value="name">Name A–Z</option>
+        </select>
+        <div style="position:relative">
+          <input type="text" id="filter-search" placeholder="Search all sessions..." style="min-width:220px" autocomplete="off">
+          <div class="search-panel" id="search-panel"></div>
+        </div>
       </div>
     </div>
-    <div class="session-feed" id="session-feed"></div>
-    <div class="load-more" id="load-more" style="display:none" onclick="loadMoreSessions()">Load more sessions...</div>
-  </div>
-
-  <!-- TAB: Skills -->
-  <div class="tab-content" id="tab-skills">
-    <div class="radar-card">
-      <h3>Skill Profile</h3>
-      <div class="radar-wrap"><canvas id="chart-skills-radar"></canvas></div>
-    </div>
-    <div class="section-label">Dimensions</div>
-    <div class="skill-dims" id="skill-dims"></div>
-    <div class="section-label">Improvement Nudges</div>
-    <div class="nudge-cards" id="skill-nudges"></div>
-  </div>
-
-  <!-- TAB: Charts -->
-  <div class="tab-content" id="tab-charts">
-    <div class="chart-grid">
-      <div class="chart-card"><h3>Outcome Distribution</h3><div class="chart-wrap"><canvas id="chart-outcome"></canvas></div></div>
-      <div class="chart-card"><h3>Productivity Trend</h3><div class="chart-wrap"><canvas id="chart-trends"></canvas></div></div>
-    </div>
-    <div class="chart-card" style="margin-bottom:20px">
-      <h3>Contribution Calendar</h3>
-      <div id="calendar-container" class="cal-heatmap"></div>
-    </div>
-    <div class="chart-card" style="margin-bottom:20px">
-      <h3>Activity by Day &amp; Hour</h3>
-      <div id="heatmap-container"></div>
+    <!-- Project tree (default view) -->
+    <div id="session-tree"></div>
+    <!-- Flat list (shown when search/filter active) -->
+    <div id="session-feed-wrap" style="display:none">
+      <div style="background:var(--surface);border:1px solid var(--border-muted);border-radius:var(--radius);overflow:hidden">
+        <div class="session-feed" id="session-feed"></div>
+        <div class="load-more" id="load-more" style="display:none" onclick="loadMoreSessions()"><span>Load more sessions</span></div>
+      </div>
     </div>
   </div>
 
-  <!-- TAB: Projects -->
-  <div class="tab-content" id="tab-projects">
-    <div class="health-table-wrap">
-      <h3>Project Health</h3>
-      <table id="project-health-table">
-        <thead><tr>
-          <th data-sort="name">Project</th>
-          <th data-sort="sessions">Sessions</th>
-          <th data-sort="completion">Completion</th>
-          <th data-sort="productivity">Productivity</th>
-          <th data-sort="errors">Errors</th>
-          <th data-sort="tokens">Tokens</th>
-          <th data-sort="cost">Tokens/Sess</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
 
   <!-- Footer -->
   <div class="footer">
@@ -644,15 +1315,8 @@ function getCSSVar(name) {
 }
 
 function reRenderChartsForTheme() {
-  // Re-render Chart.js charts if they exist
-  if (chartsLoaded) {
-    chartsLoaded = false;
-    loadCharts();
-  }
-  if (skillsLoaded) {
-    skillsLoaded = false;
-    loadSkills();
-  }
+  loadCharts();
+  loadSkills();
 }
 
 // ===== HELPERS =====
@@ -676,21 +1340,69 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '...' : (s || ''); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function shortProject(name) { return (name || '').replace(/-Users-npow-code-/g, '').replace(/-Users-npow-/g, ''); }
 function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
+
+// Simple markdown renderer for message content
+function renderMd(text) {
+  if (!text) return '';
+  // Escape HTML first
+  let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Code blocks (``` ... ```)
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code>${code}</code></pre>`
+  );
+  // Inline code
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  // Bold (process before italic)
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic (only match single * not preceded/followed by *)
+  s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+  // Headers
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Blockquotes
+  s = s.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  // Unordered lists
+  s = s.replace(/^- (.+)$/gm, '<li>$1</li>');
+  s = s.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+  // Line breaks (but not inside pre)
+  s = s.replace(/\n/g, '<br>');
+  // Clean up <br> inside <pre>
+  s = s.replace(/<pre>([\s\S]*?)<\/pre>/g, (m) => m.replace(/<br>/g, '\n'));
+  return s;
+}
+
+// Render message with collapsible long content
+function renderMessage(text, maxLen) {
+  maxLen = maxLen || 800;
+  const rendered = renderMd(text);
+  const isLong = text.length > maxLen;
+  const id = 'msg-' + Math.random().toString(36).slice(2, 8);
+  if (isLong) {
+    return `<div class="msg-text collapsed" id="${id}">${rendered}</div>
+      <span class="msg-expand-btn" onclick="document.getElementById('${id}').classList.toggle('collapsed'); this.textContent = this.textContent === 'Show more' ? 'Show less' : 'Show more'">Show more</span>`;
+  }
+  return `<div class="msg-text">${rendered}</div>`;
+}
 
 function outcomeBadge(o) { return o ? `<span class="badge badge-${o}">${(o || '').replace('_', ' ')}</span>` : ''; }
 function intentBadge(i) { return i ? `<span class="badge badge-${i}">${i}</span>` : ''; }
 function trajectoryBadge(t) { return t ? `<span class="badge badge-${t}">${t}</span>` : ''; }
 
-function outcomeIcon(outcome) {
+function outcomeColor(outcome) {
   switch (outcome) {
-    case 'completed': return '<span style="color:var(--green)">&#10003;</span>';
-    case 'partially_completed': return '<span style="color:var(--yellow)">&#9679;</span>';
-    case 'failed': return '<span style="color:var(--red)">&#10007;</span>';
-    case 'exploratory': return '<span style="color:var(--cyan)">&#9670;</span>';
-    default: return '<span style="color:var(--text-dim)">&#9679;</span>';
+    case 'completed': return 'var(--green)';
+    case 'partially_completed': return 'var(--yellow)';
+    case 'failed': return 'var(--red)';
+    case 'exploratory': return 'var(--cyan)';
+    default: return 'var(--text-dim)';
   }
+}
+function outcomeIcon(outcome) {
+  return '';
 }
 
 function prodColor(v) {
@@ -711,16 +1423,10 @@ async function loadVerdict() {
 
   const unjudged = overview.total_sessions - jStats.total_judged;
 
-  // Info stats row (agentsview-style)
-  const topProjShort = overview.top_project ? shortProject(overview.top_project) : '-';
-  const topProjPct = overview.top_project_pct ? `${(overview.top_project_pct * 100).toFixed(0)}%` : '';
-  const infoStats = `
-    <div class="verdict-stats" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-      <div class="vs"><strong>${fmtTokens(overview.total_messages)}</strong> messages</div>
-      <div class="vs"><strong>${overview.active_days}</strong> active days</div>
-      <div class="vs" title="avg / median / p90"><strong>${overview.msgs_per_session_avg}</strong> msgs/sess <span style="font-size:11px">(med ${overview.msgs_per_session_median}, p90 ${overview.msgs_per_session_p90})</span></div>
-      <div class="vs" title="Top project concentration"><strong>${topProjShort}</strong> <span style="font-size:11px">${topProjPct}</span></div>
-    </div>`;
+  // Stat cards builder
+  function statCard(value, label, sub) {
+    return `<div class="stat-card"><div class="stat-value">${value}</div><div class="stat-label">${label}</div>${sub ? `<div class="stat-sub">${sub}</div>` : ''}</div>`;
+  }
 
   if (jStats.total_judged === 0) {
     // No judgments yet — show basic stats
@@ -729,11 +1435,14 @@ async function loadVerdict() {
         <strong>${overview.total_sessions}</strong> sessions across <strong>${overview.total_projects}</strong> projects.
         ${overview.total_hours}h total. Run the LLM Judge to get AI analysis.
       </div>
-      <div class="verdict-stats">
-        <div class="vs"><strong>${overview.total_sessions}</strong> sessions</div>
-        <div class="vs"><strong>${overview.total_hours}</strong> hours</div>
-        <div class="vs"><strong>${overview.avg_turns}</strong> avg turns</div>
-      </div>` + infoStats;
+      <div class="stat-cards">
+        ${statCard(overview.total_sessions, 'Sessions')}
+        ${statCard(overview.total_hours + 'h', 'Total Time')}
+        ${statCard(overview.avg_turns, 'Avg Turns')}
+        ${statCard(fmtTokens(overview.total_messages), 'Messages')}
+        ${statCard(overview.active_days, 'Active Days')}
+        ${statCard(overview.msgs_per_session_avg, 'Msgs/Session', 'med ' + overview.msgs_per_session_median)}
+      </div>`;
     return;
   }
 
@@ -773,50 +1482,96 @@ async function loadVerdict() {
         <span>${fmtPct(wastePct)} waste</span>
       </div>
     </div>
-    <div class="verdict-stats">
-      <div class="vs"><strong>${completed}</strong> completed</div>
-      <div class="vs"><strong>${partial}</strong> partial</div>
-      <div class="vs"><strong>${failed}</strong> failed</div>
-      <div class="vs"><strong>${fmtPct(jStats.avg_clarity)}</strong> avg clarity</div>
-      <div class="vs"><strong>${jStats.avg_misalignments}</strong> avg misalign</div>
-      ${unjudged > 0 ? `<div class="vs" style="color:var(--text-dim)" title="Sessions without manual quality ratings"><strong>${unjudged}</strong> unjudged</div>` : ''}
-    </div>` + infoStats;
-
-  // Add skill summary line
-  try {
-    const skillProfile = await api('/api/skills/profile');
-    const sp = skillProfile.profile;
-    if (sp && window._skillDims) {
-      const dims = window._skillDims;
-      let best = null, bestScore = -1;
-      let gapDim = sp.gap_1;
-
-      for (const d of dims) {
-        const num = parseInt(d.id.slice(1));
-        const score = sp['d' + num + '_score'] || 0;
-        if (score > bestScore) { bestScore = score; best = d; }
-      }
-
-      if (best && bestScore > 0) {
-        const gapInfo = gapDim ? dims.find(d => d.id === gapDim) : null;
-        const gapNum = gapDim ? parseInt(gapDim.slice(1)) : 0;
-        const gapScore = gapNum ? (sp['d' + gapNum + '_score'] || 0) : 0;
-
-        let skillLine = `<div style="font-size:13px;color:var(--text-dim);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">`;
-        skillLine += `Strongest: <strong style="color:${best.color}">${best.short} (L${Math.floor(bestScore)})</strong>`;
-        if (gapInfo) {
-          skillLine += ` &middot; Biggest gap: <strong style="color:var(--yellow)">${gapInfo.short} (L${Math.floor(gapScore)} &#8594; L${Math.floor(gapScore) + 1})</strong>`;
-        }
-        skillLine += `</div>`;
-        el.innerHTML += skillLine;
-      }
-    }
-  } catch (e) { /* skill data not available yet */ }
+    <div class="stat-cards">
+      ${statCard(overview.total_sessions, 'Sessions', unjudged > 0 ? unjudged + ' unjudged' : '')}
+      ${statCard(completed, 'Completed', partial + ' partial, ' + failed + ' failed')}
+      ${statCard(fmtPct(prodPct), 'Productivity')}
+      ${overview.estimated_cost_usd > 0 ? statCard('~$' + overview.estimated_cost_usd.toFixed(2), 'Est. Cost', fmtTokens(overview.total_input_tokens + overview.total_output_tokens) + ' tokens') : ''}
+      ${statCard(fmtTokens(overview.total_tool_calls || 0), 'Tool Calls')}
+      ${statCard(overview.active_days, 'Active Days')}
+    </div>
+    <div style="display:flex;gap:16px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-muted)">
+      <div id="skill-radar-wrap" style="flex-shrink:0"></div>
+      <div id="skill-legend-wrap" style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;align-self:stretch;align-content:stretch"></div>
+    </div>`;
 
   // Store for use by change cards
   window._patterns = patterns;
   window._jStats = jStats;
   window._overview = overview;
+}
+
+// Parse structured metrics out of a _project_flags diagnosis string
+// e.g. "Productivity 61% vs 78% avg; 5.5 misalignments/session vs 2.0 avg; ..."
+function parseProjectMetrics(diagnosis) {
+  const metrics = [];
+
+  // Productivity X% vs Y% avg
+  const prod = diagnosis.match(/productivity\s+([\d.]+)%\s+vs\s+([\d.]+)%\s+avg/i);
+  if (prod) {
+    const actual = parseFloat(prod[1]);
+    const avg = parseFloat(prod[2]);
+    const diff = actual - avg;
+    metrics.push({
+      val: actual + '%',
+      delta: (diff > 0 ? '+' : '') + Math.round(diff) + 'pp',
+      label: 'Productivity',
+      color: actual < avg * 0.85 ? 'var(--red)' : 'var(--yellow)',
+      pct: actual,          // bar fill %
+      avgPct: avg,          // tick position %
+    });
+  }
+
+  // X misalignments/session vs Y avg
+  const mis = diagnosis.match(/([\d.]+)\s+misalignments\/session\s+vs\s+([\d.]+)\s+avg/i);
+  if (mis) {
+    const actual = parseFloat(mis[1]);
+    const avg = parseFloat(mis[2]);
+    const scale = avg * 4; // bar scale: 4× avg = 100%
+    metrics.push({
+      val: actual + '×',
+      delta: '+' + (actual - avg).toFixed(1) + '×',
+      label: 'Misalign/sess',
+      color: 'var(--orange)',
+      pct: Math.min(100, (actual / scale) * 100),
+      avgPct: Math.min(100, (avg / scale) * 100),
+    });
+  }
+
+  // Completion rate: X%
+  const comp = diagnosis.match(/completion rate:\s*([\d.]+)%/i);
+  if (comp) {
+    const actual = parseFloat(comp[1]);
+    metrics.push({
+      val: actual + '%',
+      delta: null,
+      label: 'Completion',
+      color: actual < 50 ? 'var(--red)' : actual < 75 ? 'var(--yellow)' : 'var(--green)',
+      pct: actual,
+      avgPct: null,
+    });
+  }
+
+  // Tool errors: only show if no misalignments (avoid 4-column overflow)
+  if (!mis) {
+    // "49 tool errors (12.2/session vs 5.9 avg)"
+    const err = diagnosis.match(/\d+\s+tool errors\s+\(([\d.]+)\/session\s+vs\s+([\d.]+)\s+avg\)/i);
+    if (err) {
+      const sess = parseFloat(err[1]);
+      const avg = parseFloat(err[2]);
+      const scale = avg * 4;
+      metrics.push({
+        val: sess.toFixed(1) + '/s',   // per-session rate is the hero
+        delta: '+' + (sess - avg).toFixed(1) + '/s',
+        label: 'Errors/sess',
+        color: 'var(--yellow)',
+        pct: Math.min(100, (sess / scale) * 100),
+        avgPct: Math.min(100, (avg / scale) * 100),
+      });
+    }
+  }
+
+  return metrics.slice(0, 3);
 }
 
 // ===== 2. CHANGE THESE 3 THINGS =====
@@ -872,29 +1627,369 @@ async function loadChangeCards() {
 
   section.style.display = 'block';
   container.innerHTML = cards.map(c => {
-    // Parse evidence field: "project:name:count" links to session filter
+    // Non-project cards: build a simple text link
     let linkHtml = '';
-    if (c.link && c.link.startsWith('project:')) {
-      const parts = c.link.split(':');
-      const projName = parts.slice(1, -1).join(':');
-      const count = parts[parts.length - 1];
-      const shortName = shortProject(projName);
-      linkHtml = `<div class="change-link" onclick="event.stopPropagation(); filterByProject('${projName.replace(/'/g, "\\'")}')">${count} sessions in ${shortName} &rarr;</div>`;
-    } else if (c.link) {
-      linkHtml = `<div class="change-link" style="cursor:default;color:var(--text-dim)">${c.link}</div>`;
+    if (c.link && !c.link.startsWith('project:')) {
+      linkHtml = `<span style="font-size:11px;color:var(--text-dim)">${c.link}</span>`;
     }
     // Split diagnosis from advice if delimiter present
     const parts = c.body.split('||SPLIT||');
     const diagnosis = parts[0];
     const advice = parts[1] || '';
-    return `<div class="change-card">
-      <div class="change-num">#${c.num}</div>
-      <div class="change-title">${c.title}</div>
-      <div class="change-body">${diagnosis}</div>
-      ${advice ? `<div style="font-size:13px;color:var(--green);margin-top:6px;line-height:1.5">→ ${advice}</div>` : ''}
-      ${linkHtml}
+
+    // Project-health card: structured widget layout
+    if (c.link && c.link.startsWith('project:')) {
+      const linkParts = c.link.split(':');
+      const projName = linkParts.slice(1, -1).join(':');
+      const short = shortProject(projName);
+      const metrics = parseProjectMetrics(diagnosis);
+      const cols = metrics.length || 1;
+      const metricsHtml = metrics.map(m => {
+        const tick = m.avgPct != null
+          ? `<div class="cc-metric-bar-tick" style="left:${m.avgPct}%"></div>` : '';
+        const bar = m.pct != null
+          ? `<div class="cc-metric-bar">
+               <div class="cc-metric-bar-fill" style="width:${Math.min(100,m.pct)}%;background:${m.color}"></div>
+               ${tick}
+             </div>` : '';
+        return `<div class="cc-metric">
+          <div>
+            <span class="cc-metric-val" style="color:${m.color}">${m.val}</span>
+            ${m.delta ? `<span class="cc-metric-delta" style="color:${m.color}">${m.delta}</span>` : ''}
+          </div>
+          <div class="cc-metric-label">${m.label}</div>
+          ${bar}
+        </div>`;
+      }).join('');
+      const shortAdvice = advice ? advice.split('.').filter(Boolean).slice(0, 2).map(s => s.trim()).join('. ') + '.' : '';
+      return `<div class="cc-card">
+        <div class="cc-header">
+          <div class="cc-project"><span class="cc-project-icon">⚠</span>${short}</div>
+          <span class="cc-num">#${c.num}</span>
+        </div>
+        <div class="cc-metrics" style="--cols:${cols}">${metricsHtml}</div>
+        ${shortAdvice ? `<div class="cc-advice"><div class="cc-advice-label">Fix</div>${shortAdvice}</div>` : ''}
+        <div class="cc-footer"><span class="cc-cta" onclick="filterByProject('${projName.replace(/'/g, "\\'")}')">View ${linkParts[linkParts.length-1]} sessions &rarr;</span></div>
+      </div>`;
+    }
+
+    // Generic card (non-project): simpler layout
+    return `<div class="cc-card">
+      <div class="cc-header">
+        <div class="cc-project" style="font-size:12px">${c.title}</div>
+        <span class="cc-num">#${c.num}</span>
+      </div>
+      <div class="cc-plain-body">${diagnosis}</div>
+      ${advice ? `<div class="cc-advice"><div class="cc-advice-label">Fix</div>${advice}</div>` : ''}
+      ${linkHtml ? `<div class="cc-footer">${linkHtml}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// ===== NARRATIVE SECTIONS =====
+async function loadSynthesis() {
+  try {
+    const data = await api('/api/synthesis');
+    const s = data.synthesis;
+    if (!s) return;
+
+    // At a Glance
+    const glance = s.at_a_glance;
+    if (glance && typeof glance === 'object') {
+      const grid = document.getElementById('glance-grid');
+      grid.innerHTML = `
+        <div class="glance-item"><h3>What's Working</h3><p>${glance.whats_working || ''}</p></div>
+        <div class="glance-item"><h3>What's Hindering</h3><p>${glance.whats_hindering || ''}</p></div>
+        <div class="glance-item"><h3>Quick Wins</h3><p>${glance.quick_wins || ''}</p></div>
+        <div class="glance-item"><h3>Ambitious Workflows</h3><p>${glance.ambitious_workflows || ''}</p></div>
+      `;
+      document.getElementById('at-a-glance').style.display = 'block';
+    }
+
+    // Usage Narrative
+    if (s.usage_narrative) {
+      const paragraphs = s.usage_narrative.split('\n').filter(p => p.trim());
+      document.getElementById('usage-narrative').innerHTML = paragraphs.map(p => `<p>${p}</p>`).join('');
+      document.getElementById('usage-narrative-section').style.display = 'block';
+    }
+
+    // Top Wins + Friction (side by side)
+    const wins = s.top_wins;
+    const friction = s.top_friction;
+    let hasWinsOrFriction = false;
+
+    if (wins && wins.length > 0) {
+      document.getElementById('wins-container').innerHTML = wins.map(w =>
+        `<div class="win-card"><h3>${w.title}</h3><p>${w.description}</p></div>`
+      ).join('');
+      hasWinsOrFriction = true;
+    }
+
+    if (friction && friction.length > 0) {
+      document.getElementById('friction-container').innerHTML = friction.map(f => {
+        const examples = (f.examples || []).map(e => e).join('; ');
+        return `<div class="friction-card">
+          <h3>${f.title}</h3>
+          <p>${f.description}</p>
+          ${examples ? `<div class="examples">${examples}</div>` : ''}
+          ${f.user_quote ? `<blockquote class="friction-quote">"${esc(f.user_quote)}"</blockquote>` : ''}
+        </div>`;
+      }).join('');
+      hasWinsOrFriction = true;
+    }
+
+    if (hasWinsOrFriction) {
+      document.getElementById('wins-friction-row').style.display = 'block';
+    }
+
+    // CLAUDE.md Additions (auto-applied to project CLAUDE.md files)
+    const additions = s.claude_md_additions;
+    if (additions && additions.length > 0) {
+      document.getElementById('claude-md-container').innerHTML = additions.map((a, i) =>
+        `<div class="claude-md-card">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="color:var(--green);font-size:11px;font-weight:600">AUTO-APPLIED</span>
+          </div>
+          <div class="rule-text" id="rule-text-${i}">${a.rule || ''}</div>
+          <div class="rationale">${a.rationale || ''}</div>
+          ${a.evidence ? `<div class="evidence">${a.evidence}</div>` : ''}
+        </div>`
+      ).join('');
+      document.getElementById('claude-md-status').textContent = `${additions.length} rules auto-applied to project CLAUDE.md files`;
+      document.getElementById('claude-md-section').style.display = 'block';
+    }
+
+    // Fun Headline
+    if (s.fun_headline) {
+      const el = document.getElementById('fun-headline');
+      el.textContent = s.fun_headline;
+      el.style.display = 'block';
+    }
+
+    // Workflow Prompts
+    renderWorkflowPrompts(s.workflow_prompts || []);
+
+    // Features to Try
+    renderFeaturesToTry(s.features_to_try || []);
+
+    // Show section nav when we have synthesis content
+    showSectionNav();
+  } catch (e) {
+    console.error('Failed to load synthesis:', e);
+  }
+}
+
+function renderWorkflowPrompts(prompts) {
+  const container = document.getElementById('workflow-prompts-list');
+  const section = document.getElementById('workflow-prompts-section');
+  if (!container || !section) return;
+  if (!prompts || prompts.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  const tagLabels = {
+    wrong_approach: 'Wrong Approach', buggy_code: 'Buggy Code',
+    tone_mismatch: 'Tone Mismatch', scope_creep: 'Scope Creep', circular_debug: 'Circular Debug'
+  };
+  container.innerHTML = prompts.map(p => `
+    <div class="workflow-card ${esc(p.friction_pattern || '')}">
+      <div class="workflow-card-header">
+        <div class="workflow-card-title">${esc(p.title || '')}</div>
+        <span class="workflow-friction-tag">${esc(tagLabels[p.friction_pattern] || p.friction_pattern || '')}</span>
+      </div>
+      <div class="workflow-description">${esc(p.description || '')}</div>
+      <div class="workflow-paste-label">PASTE INTO CLAUDE CODE:</div>
+      <div class="workflow-paste-box" style="position:relative">
+        ${esc(p.paste_prompt || '')}
+        <button class="workflow-copy-btn" onclick="copyWorkflow(this, ${JSON.stringify(p.paste_prompt || '')})">Copy</button>
+      </div>
+    </div>
+  `).join('');
+  section.style.display = 'block';
+}
+
+function renderFeaturesToTry(features) {
+  const container = document.getElementById('features-list');
+  const section = document.getElementById('features-section');
+  if (!container || !section) return;
+  if (!features || features.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  container.innerHTML = features.map(f => `
+    <div class="feature-card">
+      <div class="feature-header">
+        <span class="feature-name">${esc(f.feature || '')}</span>
+      </div>
+      <div class="feature-why">${esc(f.why_for_you || '')}</div>
+      <div class="workflow-paste-label">SETUP:</div>
+      <div class="workflow-paste-box" style="position:relative">
+        ${esc(f.setup_code || '')}
+        <button class="workflow-copy-btn" onclick="copyWorkflow(this, ${JSON.stringify(f.setup_code || '')})">Copy</button>
+      </div>
+    </div>
+  `).join('');
+  section.style.display = 'block';
+}
+
+function copyWorkflow(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  });
+}
+
+function computeFrictionTotals(sessions) {
+  const totals = {wrong_approach:0, buggy_code:0, tone_mismatch:0, scope_creep:0, circular_debug:0, other:0};
+  (sessions || []).forEach(s => {
+    if (s.friction_categories) {
+      const fc = typeof s.friction_categories === 'string' ? JSON.parse(s.friction_categories) : s.friction_categories;
+      Object.keys(totals).forEach(k => { totals[k] += (fc[k] || 0); });
+    }
+  });
+  return totals;
+}
+
+function renderFrictionCategoryBar(totals) {
+  const el = document.getElementById('friction-category-bar');
+  if (!el) return;
+  const labels = {wrong_approach:'Wrong Approach', buggy_code:'Buggy Code', tone_mismatch:'Tone Mismatch', scope_creep:'Scope Creep', circular_debug:'Circular Debug', other:'Other'};
+  const items = Object.entries(totals)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([k, v]) => `<div class="friction-cat-item ${k}"><span class="friction-cat-count">${v}</span><span class="friction-cat-label">${labels[k] || k}</span></div>`)
+    .join('');
+  el.innerHTML = items || '';
+}
+
+async function loadFrictionCategories() {
+  try {
+    const data = await api('/api/sessions?limit=500&sort=started_at+DESC');
+    const totals = computeFrictionTotals(data.sessions);
+    renderFrictionCategoryBar(totals);
+  } catch (e) {
+    // Non-fatal — friction category bar is enhancement only
+  }
+}
+
+async function loadHighlights() {
+  try {
+    const data = await api('/api/session-highlights');
+    const highlights = data.highlights;
+    if (!highlights || highlights.length === 0) return;
+
+    const TYPE_COLORS = {
+      most_productive: 'var(--green)',
+      most_wasteful: 'var(--red)',
+      most_misaligned: 'var(--orange)',
+      best_prompt: 'var(--blue)',
+      longest_success: 'var(--purple)',
+    };
+
+    // Fetch judgment details for sessions that have cost info (most_wasteful)
+    const costMap = {};
+    await Promise.all(highlights
+      .filter(h => h.type === 'most_wasteful' && h.session_id)
+      .map(async h => {
+        try {
+          const j = await api(`/api/sessions/${h.session_id}/judgment`);
+          if (j && j.estimated_cost_usd != null) costMap[h.session_id] = j.estimated_cost_usd;
+        } catch (e) { /* non-fatal */ }
+      })
+    );
+
+    document.getElementById('highlights-container').innerHTML = highlights.map(h => {
+      const color = TYPE_COLORS[h.type] || 'var(--purple)';
+      const short = shortProject(h.project || '');
+      const title = h.prompt_summary || '(no summary)';
+      const narrative = h.narrative ? h.narrative.split('\n')[0] : (h.what_worked || h.what_failed || '');
+      const narrativeHtml = narrative && narrative !== title ? `<div class="hl-narrative">${truncate(narrative, 200)}</div>` : '';
+      const cost = costMap[h.session_id];
+      const costHtml = cost != null ? `<span class="highlight-cost">~$${cost.toFixed(2)}</span>` : '';
+      return `<div class="highlight-card" style="border-left-color:${color}">
+        <div class="hl-type" style="color:${color}">${h.label}${costHtml}</div>
+        <h3>${title}</h3>
+        ${narrativeHtml}
+        <div class="hl-meta">${short} &middot; ${fmtDuration(h.duration)} &middot; ${h.outcome || ''}</div>
+        <span class="hl-link" onclick="toggleSessionById('${h.session_id}', '${(h.project||'').replace(/'/g,'')}')">View session &rarr;</span>
+      </div>`;
+    }).join('');
+    const hlSection = document.getElementById('highlights-section');
+    hlSection.style.display = 'block';
+    hlSection.classList.remove('collapsed'); // Show expanded since we just loaded
+  } catch (e) {
+    console.error('Failed to load highlights:', e);
+  }
+}
+
+function toggleSessionById(sessionId, project) {
+  // Switch to sessions tab and expand the session
+  switchTab('sessions');
+  const card = document.getElementById('scard-' + sessionId);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => toggleSession(sessionId, card), 300);
+  } else {
+    // Session not loaded yet — filter by project (if known) to narrow results, then find it
+    const projSelect = document.getElementById('filter-project');
+    const sortSelect = document.getElementById('filter-sort');
+    const searchInput = document.getElementById('filter-search');
+    // Set project filter to the session's project to minimize loaded sessions
+    if (projSelect && project) {
+      projSelect.value = project; // option values are raw project names
+    } else if (projSelect) {
+      projSelect.value = '';
+    }
+    if (sortSelect) sortSelect.value = 'started_at DESC';
+    if (searchInput) searchInput.value = '';
+    expandedSessionId = null;
+    loadSessions(false).then(() => {
+      setTimeout(() => {
+        const c = document.getElementById('scard-' + sessionId);
+        if (c) {
+          c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => toggleSession(sessionId, c), 300);
+        }
+      }, 400);
+    });
+  }
+}
+
+function scrollToSection(event, id) {
+  event.preventDefault();
+  const el = document.getElementById(id);
+  if (el) {
+    // Uncollapse if collapsed
+    if (el.classList.contains('collapsed')) el.classList.remove('collapsed');
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function showSectionNav() {
+  document.getElementById('section-nav').style.display = 'flex';
+}
+
+function copyRule(btn, index) {
+  const el = document.getElementById('rule-text-' + index);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyAllRules() {
+  const ruleEls = document.querySelectorAll('[id^="rule-text-"]');
+  const rules = Array.from(ruleEls).map(el => el.textContent.trim()).filter(Boolean);
+  if (rules.length === 0) return;
+  const text = '# Claude Retro Suggestions\n\n' + rules.join('\n');
+  const btn = document.getElementById('copy-all-rules');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied All!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy All'; btn.classList.remove('copied'); }, 2000);
+  });
 }
 
 // ===== 3. SESSION FEED =====
@@ -922,37 +2017,25 @@ async function loadSessions(append) {
     card.id = 'scard-' + s.session_id;
     card.onclick = () => toggleSession(s.session_id, card);
 
-    const icon = s.judgment_outcome ? outcomeIcon(s.judgment_outcome) : outcomeIcon(null);
+    const dotColor = outcomeColor(s.judgment_outcome);
     const prod = s.productivity_ratio;
-    const prodBg = prod != null
-      ? `background:color-mix(in srgb, ${prodColor(prod)} 12%, transparent); color:${prodColor(prod)}`
-      : 'color:var(--text-dim)';
 
     let html = `
-      <div class="s-row1">
-        <div class="s-outcome">${icon}</div>
-        <div class="s-prompt">${truncate(s.first_prompt, 90)}</div>
-        ${prod != null ? `<div class="s-prod" style="${prodBg}">${fmtPct(prod)} prod</div>` : '<div class="s-prod" style="color:var(--border);font-weight:400">unjudged</div>'}
+      <div class="s-outcome" style="background:${dotColor}"></div>
+      <div style="min-width:0;flex:1">
+        <div class="s-row1">
+          <div class="s-prompt">${truncate(s.first_prompt, 80)}</div>
+        </div>
+        <div class="s-row2">
+          <span>${shortProject(s.project_name)}</span>
+          <span class="sep">&middot;</span>
+          <span>${fmtDuration(s.duration_seconds)}</span>
+          <span class="sep">&middot;</span>
+          <span>${s.turn_count} msgs</span>
+          ${s.misalignment_count > 0 ? `<span class="sep">&middot;</span><span style="color:var(--red)">${s.misalignment_count} issue${s.misalignment_count > 1 ? 's' : ''}</span>` : ''}
+        </div>
       </div>
-      <div class="s-row2">
-        <span>${fmtDuration(s.duration_seconds)}</span>
-        <span class="sep">&middot;</span>
-        <span>${s.turn_count} turns</span>
-        <span class="sep">&middot;</span>
-        ${intentBadge(s.intent)}
-        <span class="sep">&middot;</span>
-        <span>${shortProject(s.project_name)}</span>
-        <span class="sep">&middot;</span>
-        <span>${fmtDate(s.started_at)}</span>
-      </div>`;
-
-    // Inline issue callout for problematic sessions
-    if (s.misalignment_count && s.misalignment_count > 0) {
-      html += `<div class="s-issue">
-        <span class="issue-icon">&#9888;</span>
-        ${s.misalignment_count} misalignment${s.misalignment_count > 1 ? 's' : ''}
-      </div>`;
-    }
+      ${prod != null ? `<div class="s-prod" style="background:${prodColor(prod)};color:white">${fmtPct(prod)}</div>` : ''}`;
 
     card.innerHTML = html;
     feed.appendChild(card);
@@ -1001,13 +2084,14 @@ async function toggleSession(sessionId, cardEl) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 's-detail';
   loadingDiv.innerHTML = '<div class="loading"><span class="spinner"></span></div>';
+  loadingDiv.addEventListener('click', e => e.stopPropagation());
   cardEl.appendChild(loadingDiv);
 
-  // Fetch detail + timeline + skills
+  // Fetch detail + rich timeline + skills
   const fetchStart = performance.now();
   const [detail, timeline, skillsData] = await Promise.all([
     api(`/api/sessions/${sessionId}`),
-    api(`/api/sessions/${sessionId}/timeline`),
+    api(`/api/sessions/${sessionId}/rich-timeline`),
     api(`/api/skills/session/${sessionId}`),
   ]);
   console.log(`API fetch took ${(performance.now() - fetchStart).toFixed(0)}ms`);
@@ -1029,6 +2113,36 @@ async function toggleSession(sessionId, cardEl) {
   // Skill badges
   if (skillsData.skills) {
     html += renderSkillBadges(skillsData.skills);
+  }
+
+  // Narrative block (from enriched judgment)
+  const narr = detail.narrative;
+  if (narr && narr.narrative) {
+    html += `<div class="narrative-block">
+      <div class="ai-label">Story</div>
+      <div class="narrative-text">${narr.narrative}</div>
+    </div>`;
+
+    // What worked / what failed side by side
+    if (narr.what_worked || narr.what_failed) {
+      html += '<div class="worked-failed">';
+      if (narr.what_worked) html += `<div class="wf-card wf-good"><strong style="color:var(--green)">Worked:</strong> ${narr.what_worked}</div>`;
+      if (narr.what_failed) html += `<div class="wf-card wf-bad"><strong style="color:var(--red)">Failed:</strong> ${narr.what_failed}</div>`;
+      html += '</div>';
+    }
+
+    // User quote
+    if (narr.user_quote) {
+      html += `<div class="user-quote">"${narr.user_quote}"</div>`;
+    }
+
+    // CLAUDE.md suggestion
+    if (narr.claude_md_suggestion) {
+      html += `<div class="cmd-suggestion">
+        <div class="cmd-rule">${narr.claude_md_suggestion}</div>
+        <div class="cmd-rationale">${narr.claude_md_rationale || ''}</div>
+      </div>`;
+    }
   }
 
   if (j) {
@@ -1076,17 +2190,15 @@ async function toggleSession(sessionId, cardEl) {
     const corrections = j.corrections || [];
     if (misalignments.length > 0 || corrections.length > 0) {
       // Build turn map from timeline: turn N -> {type, preview}
-      // Same logic as build_session_summary: user prompts and assistant tool batches each get a turn number
       const turnMap = {};
       let turnNum = 0;
       for (const e of timeline.timeline) {
-        if (e.entry_type === 'user' && !e.is_tool_result && e.user_text_length > 0) {
+        if (e.type === 'user' && !e.is_tool_result && e.text) {
           turnNum++;
-          turnMap[turnNum] = { type: 'user', preview: truncate(e.preview, 150) };
-        } else if (e.entry_type === 'assistant' && e.tool_names && e.tool_names.length) {
+          turnMap[turnNum] = { type: 'user', preview: truncate(e.text, 150) };
+        } else if (e.type === 'assistant' && e.tools && e.tools.length) {
           turnNum++;
-          const tools = Array.isArray(e.tool_names) ? e.tool_names : (typeof e.tool_names === 'string' ? e.tool_names.split(',') : []);
-          turnMap[turnNum] = { type: 'assistant', preview: 'Tools: ' + tools.join(', ') };
+          turnMap[turnNum] = { type: 'assistant', preview: 'Tools: ' + e.tools.map(t => t.name).join(', ') };
         }
       }
 
@@ -1174,28 +2286,80 @@ async function toggleSession(sessionId, cardEl) {
     </div>`;
   }
 
-  // Collapsible timeline
+  // Collapsible timeline — message-entry style
   const timelineId = 'tl-' + sessionId;
+  // Build result map: tool_id → {result_preview, is_error} for pairing tool calls with outputs
+  const resultMap = {};
+  for (const e of timeline.timeline) {
+    if (e.is_tool_result && e.tool_id) {
+      resultMap[e.tool_id] = { preview: e.result_preview, is_error: e.is_error };
+    }
+  }
+
+  // Render timeline entries — skip empty assistant entries and consumed tool_results
+  function renderRichTool(t) {
+    const shortName = t.name.replace(/^mcp__[^_]+__/, '').replace(/__/g, '_');
+    // Format input nicely: try to show key=val for simple objects, else truncate JSON
+    let inputHtml = '';
+    try {
+      const inp = JSON.parse(t.input_preview);
+      const keys = Object.keys(inp);
+      if (keys.length <= 4 && keys.every(k => typeof inp[k] !== 'object')) {
+        inputHtml = keys.map(k => `<span style="color:var(--text-sec)">${esc(k)}</span>=<span style="color:var(--text)">${esc(String(inp[k]).slice(0, 60))}</span>`).join(' ');
+      } else {
+        inputHtml = `<span style="color:var(--text-dim)">${esc(truncate(t.input_preview, 120))}</span>`;
+      }
+    } catch { inputHtml = `<span style="color:var(--text-dim)">${esc(truncate(t.input_preview, 120))}</span>`; }
+
+    const res = resultMap[t.id];
+    let resultHtml = '';
+    if (res) {
+      const resCls = res.is_error ? 'tl-tool-result tl-result-err' : 'tl-tool-result';
+      const resText = res.preview ? esc(truncate(res.preview, 200)) : (res.is_error ? 'error' : 'ok');
+      resultHtml = `<div class="${resCls}">${resText}</div>`;
+    }
+
+    return `<div class="tl-tool-call">
+      <span class="tl-tool-name">${esc(shortName)}</span> <span style="font-size:10px;font-family:var(--font-mono)">${inputHtml}</span>
+      ${resultHtml}
+    </div>`;
+  }
+
+  const tlEntries = timeline.timeline.filter(e => {
+    if (e.is_tool_result) return false; // consumed by resultMap
+    if (e.type === 'assistant' && !e.text && (!e.tools || !e.tools.length)) return false; // empty
+    return true;
+  });
+
+  const tlLabel = `${tlEntries.length} turns`;
   html += `<div class="ai-section">
-    <div class="timeline-toggle" onclick="event.stopPropagation(); document.getElementById('${timelineId}').classList.toggle('open'); this.innerHTML = document.getElementById('${timelineId}').classList.contains('open') ? '&#9660; Hide timeline (${timeline.timeline.length} entries)' : '&#9654; Show timeline (${timeline.timeline.length} entries)'">
-      &#9654; Show timeline (${timeline.timeline.length} entries)
+    <div class="timeline-toggle" onclick="event.stopPropagation(); document.getElementById('${timelineId}').classList.toggle('open'); this.textContent = document.getElementById('${timelineId}').classList.contains('open') ? '\u25BE Hide timeline (${tlLabel})' : '\u25B8 Show timeline (${tlLabel})'">
+      \u25B8 Show timeline (${tlLabel})
     </div>
     <div class="timeline-content" id="${timelineId}">
-      ${timeline.timeline.slice(0, 100).map(e => {
-        let detail = '';
-        if (e.entry_type === 'user' && !e.is_tool_result) detail = truncate(e.preview, 120);
-        else if (e.entry_type === 'assistant' && e.tool_names && e.tool_names.length) {
-          const tools = Array.isArray(e.tool_names) ? e.tool_names : (typeof e.tool_names === 'string' ? e.tool_names.split(',') : []);
-          detail = 'Tools: ' + tools.join(', ');
+      ${tlEntries.map(e => {
+        const roleCls = { user: 'tl-user', assistant: 'tl-assistant', system: 'tl-system' }[e.type] || 'tl-system';
+        const roleLabel = e.type;
+        const roleLabelCls = { user: 'r-user', assistant: 'r-assistant' }[e.type] || 'r-system';
+
+        let content = '';
+        if (e.type === 'user') {
+          content = `<div class="tl-preview">${esc(truncate(e.text || '', 200))}</div>`;
+        } else if (e.type === 'assistant') {
+          if (e.text) content += `<div class="tl-preview">${esc(truncate(e.text, 200))}</div>`;
+          if (e.tools && e.tools.length) {
+            content += `<div class="tl-tools">${e.tools.map(renderRichTool).join('')}</div>`;
+          }
+        } else if (e.type === 'system') {
+          content = `<div class="tl-preview">${esc(e.system_subtype || '')}${e.duration_ms ? ' (' + (e.duration_ms/1000).toFixed(1) + 's)' : ''}</div>`;
         }
-        else if (e.entry_type === 'assistant') detail = truncate(e.preview, 120);
-        else if (e.entry_type === 'system') detail = (e.system_subtype || '') + (e.duration_ms ? ` (${(e.duration_ms/1000).toFixed(1)}s)` : '');
-        else if (e.is_tool_result) detail = 'Tool result' + (e.tool_result_error ? ' (ERROR)' : '');
-        const typeColor = { user: 'var(--accent)', assistant: 'var(--green)', system: 'var(--yellow)' }[e.entry_type] || 'var(--text-dim)';
-        return `<div class="timeline-entry">
-          <div class="te-type" style="color:${typeColor}">${e.entry_type}${e.is_tool_result ? ' (res)' : ''}</div>
-          <div class="te-time">${fmtDate(e.timestamp_utc)}</div>
-          <div class="te-detail">${detail}</div>
+
+        return `<div class="tl-msg ${roleCls}">
+          <div class="tl-header">
+            <span class="tl-role ${roleLabelCls}">${roleLabel}</span>
+            <span class="tl-time">${fmtDate(e.timestamp)}</span>
+          </div>
+          ${content}
         </div>`;
       }).join('')}
     </div>
@@ -1215,13 +2379,122 @@ async function toggleSession(sessionId, cardEl) {
   });
 });
 let searchTimeout;
-document.getElementById('filter-search').addEventListener('input', () => {
+const searchInput = document.getElementById('filter-search');
+const searchPanel = document.getElementById('search-panel');
+
+searchInput.addEventListener('input', () => {
   clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    expandedSessionId = null;
-    loadSessions(false);
-  }, 300);
+  const q = searchInput.value.trim();
+  if (q.length < 2) {
+    searchPanel.classList.remove('open');
+    if (q.length === 0) {
+      // Back to tree view
+      showTreeView();
+    } else {
+      // Short query: show flat with basic filter
+      document.getElementById('session-tree').style.display = 'none';
+      document.getElementById('session-feed-wrap').style.display = 'block';
+      searchTimeout = setTimeout(() => { expandedSessionId = null; loadSessions(false); }, 300);
+    }
+    return;
+  }
+  // Longer query: switch to flat list + FTS dropdown
+  document.getElementById('session-tree').style.display = 'none';
+  document.getElementById('session-feed-wrap').style.display = 'block';
+  searchTimeout = setTimeout(() => { expandedSessionId = null; loadSessions(false); doFullTextSearch(q); }, 300);
 });
+
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    searchPanel.classList.remove('open');
+    searchInput.blur();
+  }
+});
+
+// Close search panel when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.filter-bar')) {
+    searchPanel.classList.remove('open');
+  }
+});
+
+async function doFullTextSearch(q) {
+  const project = document.getElementById('filter-project').value;
+  const params = new URLSearchParams({ q, limit: 20 });
+  if (project) params.set('project', project);
+
+  // Show loading state
+  searchPanel.innerHTML = '<div class="search-empty" style="display:flex;align-items:center;gap:8px"><span class="spinner" style="width:14px;height:14px;border-width:2px"></span> Searching…</div>';
+  searchPanel.classList.add('open');
+
+  try {
+    const data = await api('/api/search?' + params);
+    if (data.results.length === 0) {
+      searchPanel.innerHTML = '<div class="search-empty">No results found</div>';
+      searchPanel.classList.add('open');
+      return;
+    }
+
+    searchPanel.innerHTML = data.results.map(r => {
+      const roleColor = r.entry_type === 'user' ? 'var(--accent)' : 'var(--accent2)';
+      const roleChar = r.entry_type === 'user' ? 'U' : 'A';
+      const short = shortProject(r.project || '');
+      // Sanitize snippet — only allow <mark> tags
+      const snippet = sanitizeSnippet(r.snippet || '');
+      return `<div class="search-result" onclick="jumpToSession('${r.session_id}')">
+        <div class="sr-role" style="background:${roleColor}">${roleChar}</div>
+        <div class="sr-body">
+          <div class="sr-snippet">${snippet}</div>
+          <div class="sr-meta">${short} &middot; ${fmtDate(r.started_at)} &middot; ${r.first_prompt ? truncate(r.first_prompt, 50) : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
+    searchPanel.classList.add('open');
+  } catch (e) {
+    console.error('Search failed:', e);
+  }
+}
+
+function sanitizeSnippet(html) {
+  // Only allow <mark> tags for search highlights — strip everything else
+  return html
+    .replace(/<mark>/gi, '\x00OPEN\x00')
+    .replace(/<\/mark>/gi, '\x00CLOSE\x00')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replaceAll('\x00OPEN\x00', '<mark>')
+    .replaceAll('\x00CLOSE\x00', '</mark>');
+}
+
+function jumpToSession(sessionId) {
+  searchPanel.classList.remove('open');
+  searchInput.value = '';
+  switchTab('sessions');
+  // Find the session card in the current loaded list
+  const card = document.getElementById('scard-' + sessionId);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => toggleSession(sessionId, card), 300);
+  } else {
+    // Session not in current page — reset filters and search by ID
+    document.getElementById('filter-project').value = '';
+    document.getElementById('filter-sort').value = 'started_at DESC';
+    expandedSessionId = null;
+    // Use the API search parameter which searches session_id
+    const origSearch = searchInput.value;
+    searchInput.value = '';
+    // Load all sessions and try to find it
+    loadSessions(false).then(() => {
+      // Try expanding — the session might be in the first page now
+      setTimeout(() => {
+        const c = document.getElementById('scard-' + sessionId);
+        if (c) {
+          c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => toggleSession(sessionId, c), 300);
+        }
+      }, 500);
+    });
+  }
+}
 
 function populateFilters(projects) {
   const projSelect = document.getElementById('filter-project');
@@ -1232,41 +2505,190 @@ function populateFilters(projects) {
 }
 
 function filterByProject(projectName) {
-  // Switch to Sessions tab, set project filter, reload
   switchTab('sessions');
-  const projSelect = document.getElementById('filter-project');
-  projSelect.value = projectName;
+  openProjectInTree(projectName);
+}
+
+function openProjectInTree(projectName) {
+  // Clear any search/filter state
+  document.getElementById('filter-project').value = '';
+  document.getElementById('filter-search').value = '';
+  document.getElementById('session-tree').style.display = 'block';
+  document.getElementById('session-feed-wrap').style.display = 'none';
+
+  const projEl = document.getElementById('st-proj-' + CSS.escape(projectName));
+  if (projEl) {
+    if (!projEl.classList.contains('open')) toggleProjectTree(projectName);
+    setTimeout(() => projEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
+}
+
+// ===== SESSION TREE =====
+let _treeSortKey = 'sessions';
+
+function renderSessionTree() {
+  const projList = window._projList || [];
+  const treeEl = document.getElementById('session-tree');
+  if (!treeEl) return;
+
+  const sortFns = {
+    sessions: (a, b) => b.session_count - a.session_count,
+    productivity: (a, b) => (b.avg_productivity || 0) - (a.avg_productivity || 0),
+    completion: (a, b) => (b.completion_rate || 0) - (a.completion_rate || 0),
+    name: (a, b) => a.project_name.localeCompare(b.project_name),
+  };
+  const sorted = [...projList].sort(sortFns[_treeSortKey] || sortFns.sessions);
+
+  // Preserve open state
+  const openProjects = new Set(
+    [...document.querySelectorAll('.st-project.open')].map(el => el.dataset.project)
+  );
+
+  treeEl.innerHTML = sorted.map(p => {
+    const prod = p.avg_productivity;
+    const comp = p.completion_rate;
+    const isOpen = openProjects.has(p.project_name);
+    const pc = v => v != null ? (v >= 0.7 ? 'var(--green)' : v >= 0.4 ? 'var(--yellow)' : 'var(--red)') : 'var(--text-dim)';
+    const totalTok = (p.total_input_tokens || 0) + (p.total_output_tokens || 0);
+    return `<div class="st-project${isOpen ? ' open' : ''}" id="st-proj-${CSS.escape(p.project_name)}" data-project="${esc(p.project_name)}" data-loaded="">
+      <div class="st-proj-header" onclick="toggleProjectTree('${esc(p.project_name).replace(/'/g,"\\'")}')">
+        <span class="st-caret">&#9654;</span>
+        <span class="st-proj-name">${shortProject(p.project_name)}</span>
+        <span class="st-proj-meta">${p.session_count} session${p.session_count !== 1 ? 's' : ''}</span>
+        <div class="st-proj-stats">
+          ${prod != null ? `<span class="st-stat" style="color:${pc(prod)}">${fmtPct(prod)} prod</span>` : ''}
+          ${comp != null ? `<span class="st-stat" style="color:${pc(comp)}">${fmtPct(comp)} done</span>` : ''}
+          ${p.total_errors ? `<span class="st-stat" style="color:var(--red)">${p.total_errors} err</span>` : ''}
+          <span class="st-stat">${fmtTokens(totalTok)}</span>
+        </div>
+      </div>
+      <div class="st-sessions" style="display:${isOpen ? 'block' : 'none'}">
+        <div class="loading" style="padding:20px"><span class="spinner"></span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Re-load sessions for projects that were open
+  for (const proj of openProjects) loadProjectSessions(proj);
+}
+
+async function toggleProjectTree(projectName) {
+  const projEl = document.getElementById('st-proj-' + CSS.escape(projectName));
+  if (!projEl) return;
+  const isOpen = projEl.classList.toggle('open');
+  const sessionsEl = projEl.querySelector('.st-sessions');
+  sessionsEl.style.display = isOpen ? 'block' : 'none';
+  if (isOpen && !projEl.dataset.loaded) loadProjectSessions(projectName);
+}
+
+async function loadProjectSessions(projectName) {
+  const projEl = document.getElementById('st-proj-' + CSS.escape(projectName));
+  if (!projEl) return;
+  projEl.dataset.loaded = '1';
+  const sessionsEl = projEl.querySelector('.st-sessions');
+  const data = await api(`/api/sessions?limit=30&sort=started_at+DESC&project=${encodeURIComponent(projectName)}`);
+  sessionsEl.innerHTML = '';
+  data.sessions.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.id = 'scard-' + s.session_id;
+    card.onclick = () => toggleSession(s.session_id, card);
+    const dotColor = outcomeColor(s.judgment_outcome);
+    const prod = s.productivity_ratio;
+    card.innerHTML = `
+      <div class="s-outcome" style="background:${dotColor}"></div>
+      <div style="min-width:0;flex:1">
+        <div class="s-row1"><div class="s-prompt">${truncate(s.first_prompt, 80)}</div></div>
+        <div class="s-row2">
+          <span>${fmtDuration(s.duration_seconds)}</span>
+          <span class="sep">&middot;</span>
+          <span>${s.turn_count} msgs</span>
+          ${s.misalignment_count > 0 ? `<span class="sep">&middot;</span><span style="color:var(--red)">${s.misalignment_count} issue${s.misalignment_count > 1 ? 's' : ''}</span>` : ''}
+        </div>
+      </div>
+      ${prod != null ? `<div class="s-prod" style="background:${prodColor(prod)};color:white">${fmtPct(prod)}</div>` : ''}`;
+    sessionsEl.appendChild(card);
+  });
+  if (data.total > data.sessions.length) {
+    const more = document.createElement('div');
+    more.className = 'st-more';
+    more.textContent = `Show all ${data.total} sessions →`;
+    more.onclick = e => { e.stopPropagation(); showFlatByProject(projectName); };
+    sessionsEl.appendChild(more);
+  }
+}
+
+function showFlatByProject(projectName) {
+  document.getElementById('filter-project').value = projectName;
+  document.getElementById('session-tree').style.display = 'none';
+  document.getElementById('session-feed-wrap').style.display = 'block';
   expandedSessionId = null;
   loadSessions(false);
 }
 
-// ===== TABS =====
-let chartsLoaded = false;
-let projectsLoaded = false;
-let skillsLoaded = false;
+function showTreeView() {
+  document.getElementById('filter-project').value = '';
+  document.getElementById('session-tree').style.display = 'block';
+  document.getElementById('session-feed-wrap').style.display = 'none';
+}
 
+document.getElementById('tree-sort').addEventListener('change', e => {
+  _treeSortKey = e.target.value;
+  renderSessionTree();
+});
+
+// ===== TABS =====
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
   document.getElementById('tab-' + tabName).classList.add('active');
-
-  // Lazy-load tab content on first view (avoids Chart.js zero-dimension bug)
-  if (tabName === 'skills' && !skillsLoaded) {
-    skillsLoaded = true;
-    loadSkills();
-  }
-  if (tabName === 'charts' && !chartsLoaded) {
-    chartsLoaded = true;
-    loadCharts();
-  }
-  if (tabName === 'projects' && !projectsLoaded) {
-    projectsLoaded = true;
-    loadProjectHealth();
-  }
 }
 
-// ===== SKILLS TAB =====
+// ===== SKILLS (radar + legend in verdict) =====
+function renderSkillRadar(dims, profile) {
+  const n = dims.length;
+  const sz = 200, cx = sz / 2, cy = sz / 2, r = 72;
+  const pt = (i, f) => {
+    const a = (2 * Math.PI * i / n) - Math.PI / 2;
+    return [cx + f * r * Math.cos(a), cy + f * r * Math.sin(a)];
+  };
+  let svg = `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="display:block">`;
+  // Level labels on vertical axis (L1–L4)
+  for (let lv = 1; lv <= 4; lv++) {
+    const [lx, ly] = pt(0, lv / 5);
+    svg += `<text x="${(lx + 2).toFixed(1)}" y="${(ly - 1).toFixed(1)}" font-size="8" fill="var(--text-dim)" opacity="0.6">L${lv}</text>`;
+  }
+  // Grid rings
+  for (let lv = 1; lv <= 5; lv++) {
+    const pts = dims.map((_, i) => { const [x, y] = pt(i, lv / 5); return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
+    svg += `<polygon points="${pts}" fill="none" stroke="var(--border-muted)" stroke-width="${lv === 5 ? 0.8 : 0.4}"/>`;
+  }
+  // Axes
+  dims.forEach((d, i) => {
+    const [x, y] = pt(i, 1);
+    svg += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${d.color}" stroke-width="0.6" opacity="0.35"/>`;
+  });
+  // Score polygon
+  const scores = dims.map(d => Math.min((profile['d' + parseInt(d.id.slice(1)) + '_score'] || 0) / 5, 1));
+  const polyPts = dims.map((_, i) => { const [x, y] = pt(i, scores[i]); return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
+  svg += `<polygon points="${polyPts}" fill="var(--purple)" fill-opacity="0.2" stroke="var(--purple)" stroke-width="1.5" stroke-linejoin="round"/>`;
+  // Colored vertex dots + axis-end dots
+  dims.forEach((d, i) => {
+    const score = profile['d' + parseInt(d.id.slice(1)) + '_score'] || 0;
+    const [vx, vy] = pt(i, scores[i]);
+    const [ax, ay] = pt(i, 1.0);
+    // Axis endpoint dot
+    svg += `<circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="2.5" fill="${d.color}" opacity="0.4"/>`;
+    // Score dot
+    if (scores[i] > 0.05) {
+      svg += `<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="3.5" fill="${d.color}" stroke="var(--bg)" stroke-width="1"><title>${d.short}: L${Math.floor(score)} (${score.toFixed(1)})</title></circle>`;
+    }
+  });
+  svg += '</svg>';
+  return svg;
+}
+
 async function loadSkills() {
   const [dims, profile, nudges, detail] = await Promise.all([
     api('/api/skills/dimensions'),
@@ -1277,134 +2699,63 @@ async function loadSkills() {
 
   const p = profile.profile;
   const dimList = dims.dimensions;
-  const detailDims = detail.dimensions || [];
 
-  // Radar chart
-  if (p) {
-    destroyChart('skillsRadar');
-    const labels = dimList.map(d => d.short);
-    const scores = dimList.map(d => {
-      const num = parseInt(d.id.slice(1));
-      return p['d' + num + '_score'] || 0;
-    });
+  const radarWrap = document.getElementById('skill-radar-wrap');
+  const legendWrap = document.getElementById('skill-legend-wrap');
 
-    const accentColor = getCSSVar('--accent');
-    const textDim = getCSSVar('--text-dim');
-    const textColor = getCSSVar('--text');
-    const gridColor = getCSSVar('--border');
-
-    charts.skillsRadar = new Chart(document.getElementById('chart-skills-radar'), {
-      type: 'radar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Skill Level',
-          data: scores,
-          backgroundColor: accentColor + '26',
-          borderColor: accentColor,
-          borderWidth: 2,
-          pointBackgroundColor: accentColor,
-          pointBorderColor: accentColor,
-          pointRadius: 4,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          r: {
-            min: 0,
-            max: 5,
-            ticks: {
-              stepSize: 1,
-              color: textDim,
-              backdropColor: 'transparent',
-              font: { size: 10 },
-            },
-            grid: { color: gridColor },
-            angleLines: { color: gridColor },
-            pointLabels: { color: textColor, font: { size: 11, weight: '500' } },
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => `Level ${ctx.raw.toFixed(1)}`,
-            }
-          }
-        }
-      }
-    });
+  if (!p) {
+    if (radarWrap) radarWrap.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:8px">No skill data yet.</div>';
+    return;
   }
 
-  // Dimension cards (with expandable detail + example sessions)
-  const dimsContainer = document.getElementById('skill-dims');
-  if (p) {
-    const gaps = [p.gap_1, p.gap_2, p.gap_3].filter(Boolean);
-    // Build a lookup from detail API
-    const detailMap = {};
-    detailDims.forEach(dd => { detailMap[dd.id] = dd; });
+  const scores = dimList.map(d => p['d' + parseInt(d.id.slice(1)) + '_score'] || 0);
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const gaps = [p.gap_1, p.gap_2, p.gap_3].filter(Boolean);
+  const detailMap = {};
+  (detail.dimensions || []).forEach(dd => { detailMap[dd.id] = dd; });
 
-    dimsContainer.innerHTML = dimList.map(d => {
-      const num = parseInt(d.id.slice(1));
-      const score = p['d' + num + '_score'] || 0;
+  // Radar
+  if (radarWrap) {
+    radarWrap.innerHTML = renderSkillRadar(dimList, p)
+      + `<div style="font-size:10px;color:var(--text-dim);text-align:center;margin-top:2px">Avg L${Math.floor(avg)} (${avg.toFixed(1)})${gaps.length ? ` · <span style="color:var(--yellow)">${gaps.length} gap${gaps.length > 1 ? 's' : ''}</span>` : ''}</div>`;
+  }
+
+  // Legend: dimension name + mini bar + level + level-up nudge on click
+  if (legendWrap) {
+    legendWrap.innerHTML = dimList.map((d, i) => {
+      const score = scores[i];
       const level = Math.floor(score);
+      const pct = (score / 5 * 100).toFixed(0);
       const isGap = gaps.includes(d.id);
       const dd = detailMap[d.id] || {};
-      const nudge = dd.nudge || '';
-      const examples = dd.examples || [];
-
-      let dots = '';
-      for (let i = 1; i <= 5; i++) {
-        const cls = i <= level ? 'filled' : (isGap && i === level + 1 ? 'opportunity' : '');
-        dots += `<div class="level-dot ${cls}" style="${i <= level ? 'background:' + d.color : ''}"></div>`;
-      }
-
-      let detailHtml = '';
-      if (nudge) {
-        detailHtml += `<div class="skill-dim-nudge"><strong>To reach L${level + 1}:</strong> ${nudge}</div>`;
-      }
-      if (examples.length > 0) {
-        detailHtml += '<div class="skill-dim-examples"><strong style="color:var(--text-dim)">Example sessions:</strong>';
-        examples.forEach(ex => {
-          const prompt = ex.first_prompt || '(no prompt)';
-          detailHtml += `<a href="#" onclick="event.preventDefault();showSession('${ex.session_id}')"><span class="ex-label">${ex.label}</span> ${prompt}</a>`;
-        });
-        detailHtml += '</div>';
-      }
-
-      return `<div class="skill-dim-card" style="border-left: 3px solid ${d.color}" onclick="this.classList.toggle('expanded')">
-        <div class="skill-dim-header">
-          <span class="skill-dim-name">${d.name}</span>
-          <div class="skill-dim-levels">${dots}</div>
+      const nudgeText = dd.nudge ? `To reach L${level + 1}: ${dd.nudge}` : '';
+      return `<div class="skill-legend-row" onclick="this.classList.toggle('open')" style="cursor:pointer;background:var(--surface2);border-radius:5px;padding:8px 12px;border-left:3px solid ${d.color};display:flex;flex-direction:column;justify-content:center" data-nudge="${esc(nudgeText)}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;color:var(--text-sec);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.short}</span>
+          <span style="font-size:12px;font-weight:700;color:${d.color};background:${d.color}22;padding:2px 7px;border-radius:4px;flex-shrink:0">${isGap ? '▲' : ''}L${level}</span>
         </div>
-        <div class="skill-dim-gap">
-          L${level} (${score.toFixed(1)})${isGap ? ' <span style="color:var(--yellow)">&#9650; gap</span>' : ''}
-          ${nudge ? ' <span style="color:var(--text-dim);font-size:10px">click to expand</span>' : ''}
-        </div>
-        <div class="skill-dim-detail">${detailHtml}</div>
+        ${nudgeText ? `<div class="skill-legend-nudge">${nudgeText}</div>` : ''}
       </div>`;
     }).join('');
-  } else {
-    dimsContainer.innerHTML = '<div class="empty-state">No skill data yet. Run ingest to analyze sessions.</div>';
   }
 
-  // Nudge cards
-  const nudgeContainer = document.getElementById('skill-nudges');
-  if (nudges.nudges.length > 0) {
-    nudgeContainer.innerHTML = nudges.nudges.map(n => `
-      <div class="nudge-card" id="nudge-${n.id}" style="border-left-color:${n.dimension_color}">
-        <div class="nudge-header">
-          <span class="nudge-dim" style="color:${n.dimension_color}">${n.dimension_name}</span>
-          <span class="nudge-level">L${n.current_level} &#8594; L${n.target_level}</span>
-        </div>
-        <div class="nudge-text">${n.nudge_text}</div>
-        <span class="nudge-dismiss" onclick="event.stopPropagation(); dismissNudge(${n.id})">dismiss</span>
-      </div>
-    `).join('');
-  } else {
-    nudgeContainer.innerHTML = '<div class="empty-state">No nudges yet.</div>';
+  // Nudges — show inline below verdict if any active
+  const nudgeSection = document.getElementById('skill-nudges-section');
+  if (nudgeSection) {
+    const active = (nudges.nudges || []).filter(n => !n.dismissed);
+    nudgeSection.style.display = active.length ? 'block' : 'none';
+    nudgeSection.innerHTML = active.length ? `
+      <div class="section-label" style="color:var(--purple)">Skill Nudges</div>
+      <div class="nudge-cards">${active.slice(0, 3).map(n => `
+        <div class="nudge-card" id="nudge-${n.id}" style="border-left-color:${n.dimension_color}">
+          <div class="nudge-header">
+            <span class="nudge-dim" style="color:${n.dimension_color}">${n.dimension_name}</span>
+            <span class="nudge-level">L${n.current_level} &#8594; L${n.target_level}</span>
+          </div>
+          <div class="nudge-text">${n.nudge_text}</div>
+          <span class="nudge-dismiss" onclick="event.stopPropagation();dismissNudge(${n.id})">dismiss</span>
+        </div>`).join('')}
+      </div>` : '';
   }
 }
 
@@ -1423,41 +2774,52 @@ async function showSession(sessionId) {
   try {
     const [detail, timeline] = await Promise.all([
       api('/api/sessions/' + sessionId),
-      api('/api/sessions/' + sessionId + '/timeline'),
+      api('/api/sessions/' + sessionId + '/timeline?full=1'),
     ]);
     const s = detail.session;
     const entries = timeline.timeline || [];
 
-    let html = `<h3>${s.first_prompt ? s.first_prompt.slice(0, 120) : sessionId}</h3>`;
-    html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">`;
-    html += `${s.started_at ? new Date(s.started_at).toLocaleString() : ''} &middot; `;
-    html += `${s.turn_count || 0} turns &middot; ${Math.round((s.duration_seconds || 0) / 60)}m`;
-    if (s.project_name) html += ` &middot; ${s.project_name}`;
-    html += `</div>`;
+    let html = `<div class="modal-header">`;
+    html += `<h3>${s.first_prompt ? s.first_prompt.slice(0, 120) : sessionId}</h3>`;
+    html += `<div class="modal-meta">`;
+    html += `<span>${s.started_at ? new Date(s.started_at).toLocaleString() : ''}</span>`;
+    html += `<span class="sep">&middot;</span>`;
+    html += `<span>${s.turn_count || 0} turns</span>`;
+    html += `<span class="sep">&middot;</span>`;
+    html += `<span>${Math.round((s.duration_seconds || 0) / 60)}m</span>`;
+    if (s.project_name) {
+      html += `<span class="sep">&middot;</span>`;
+      html += `<span>${shortProject(s.project_name)}</span>`;
+    }
+    html += `</div></div>`;
 
     if (detail.judgment) {
       const j = detail.judgment;
-      html += `<div style="margin-bottom:12px;padding:8px 10px;background:var(--surface);border-radius:6px;font-size:12px">`;
+      html += `<div class="modal-judgment">`;
       html += `<strong>${j.outcome}</strong> &middot; ${(j.productivity_ratio * 100).toFixed(0)}% productive`;
-      if (j.trajectory_summary) html += `<div style="color:var(--text-dim);margin-top:4px">${j.trajectory_summary}</div>`;
+      if (j.trajectory_summary) html += `<div class="judge-summary">${j.trajectory_summary}</div>`;
       html += `</div>`;
     }
 
-    // Build compact timeline: show user prompts and summarize assistant tool runs
-    html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Timeline</div>';
+    // Build message-style timeline with markdown rendering
+    html += '<div class="modal-body">';
+    html += '<div class="modal-section-label">Conversation</div>';
     let turnNum = 0;
     let i = 0;
     while (i < entries.length) {
       const e = entries[i];
-      if (e.entry_type === 'user' && !e.is_tool_result && e.user_text) {
+      if (e.entry_type === 'user' && !e.is_tool_result && (e.user_text || e.preview)) {
         turnNum++;
-        const text = e.user_text.slice(0, 300) + (e.user_text.length > 300 ? '...' : '');
-        html += `<div class="timeline-entry"><span class="tl-type" style="color:var(--green)">Turn ${turnNum} - User</span><div class="tl-text">${text}</div></div>`;
+        const text = e.user_text || e.preview || '';
+        html += `<div class="msg-entry msg-user">`;
+        html += `<div class="msg-header"><span class="msg-role-icon" style="background:var(--accent)">U</span><span class="msg-role role-user">User</span><span class="msg-turn">Turn ${turnNum}</span></div>`;
+        html += renderMessage(text);
+        html += `</div>`;
         i++;
       } else if (e.entry_type === 'assistant') {
-        // Collect consecutive assistant entries into one block
         const tools = [];
         let hasError = false;
+        let assistantText = '';
         while (i < entries.length && (entries[i].entry_type === 'assistant' || (entries[i].entry_type === 'user' && entries[i].is_tool_result))) {
           const ae = entries[i];
           if (ae.tool_names) {
@@ -1465,18 +2827,24 @@ async function showSession(sessionId) {
             t.forEach(x => { const n = x.trim(); if (n && !tools.includes(n)) tools.push(n); });
           }
           if (ae.tool_result_error) hasError = true;
+          // Capture assistant text (reasoning before tool calls)
+          if (ae.entry_type === 'assistant' && ae.preview && !ae.tool_names) {
+            assistantText = ae.preview;
+          }
           i++;
         }
         turnNum++;
-        let line = `<div class="timeline-entry"><span class="tl-type" style="color:var(--accent)">Turn ${turnNum} - Assistant</span>`;
-        if (tools.length) line += ` <span class="tl-tools">${tools.join(', ')}</span>`;
-        if (hasError) line += ` <span class="tl-error">ERROR</span>`;
-        line += '</div>';
-        html += line;
+        html += `<div class="msg-entry msg-assistant">`;
+        html += `<div class="msg-header"><span class="msg-role-icon" style="background:var(--accent2)">A</span><span class="msg-role role-assistant">Assistant</span><span class="msg-turn">Turn ${turnNum}</span></div>`;
+        if (assistantText) html += `<div class="msg-text" style="color:var(--text-dim);font-size:13px;margin-bottom:6px">${renderMd(assistantText)}</div>`;
+        if (tools.length) html += `<div class="msg-tools">${tools.map(t => `<span>${t}</span>`).join('')}</div>`;
+        if (hasError) html += `<div class="msg-error">Error during execution</div>`;
+        html += `</div>`;
       } else {
-        i++; // skip system entries
+        i++;
       }
     }
+    html += '</div>';
 
     content.innerHTML = html;
   } catch (err) {
@@ -1506,8 +2874,7 @@ function renderSkillBadges(skills) {
 }
 
 async function loadCharts() {
-  const [jStats, heatmap, calData, sessData] = await Promise.all([
-    api('/api/judgments/stats'),
+  const [heatmap, calData, sessData] = await Promise.all([
     api('/api/heatmap'),
     api('/api/heatmap/calendar'),
     api('/api/sessions?limit=50&sort=started_at+ASC'),
@@ -1516,31 +2883,6 @@ async function loadCharts() {
   const textDim = getCSSVar('--text-dim');
   const gridColor = getCSSVar('--border');
   const greenColor = getCSSVar('--green');
-
-  // Outcome distribution donut
-  const od = jStats.outcome_distribution || {};
-  const OUTCOME_COLORS = { completed: getCSSVar('--green'), partially_completed: getCSSVar('--yellow'), failed: getCSSVar('--red'), abandoned: getCSSVar('--text-dim'), exploratory: getCSSVar('--cyan') };
-  destroyChart('outcome');
-  const outcomeCanvas = document.getElementById('chart-outcome');
-  if (Object.keys(od).length > 0) {
-    charts.outcome = new Chart(outcomeCanvas, {
-      type: 'doughnut',
-      data: {
-        labels: Object.keys(od).map(k => k.replace('_', ' ')),
-        datasets: [{ data: Object.values(od), backgroundColor: Object.keys(od).map(k => OUTCOME_COLORS[k] || getCSSVar('--text-dim')), borderWidth: 0 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: textDim, font: { size: 12 } } } } }
-    });
-  } else {
-    const ctx = outcomeCanvas.getContext('2d');
-    ctx.clearRect(0, 0, outcomeCanvas.width, outcomeCanvas.height);
-    ctx.fillStyle = textDim;
-    ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('No judgment data yet', outcomeCanvas.width / 2, outcomeCanvas.height / 2 - 10);
-    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-    ctx.fillText('Use "Run LLM Judge" to rate sessions', outcomeCanvas.width / 2, outcomeCanvas.height / 2 + 10);
-  }
 
   // Productivity trend (judged sessions only)
   const sessArr = sessData.sessions.filter(s => s.productivity_ratio != null);
@@ -1568,8 +2910,8 @@ async function loadCharts() {
     ctx.fillText('Use "Run LLM Judge" to rate sessions', trendsCanvas.width / 2, trendsCanvas.height / 2 + 10);
   }
 
-  // Calendar heatmap
-  renderCalendarHeatmap(calData.calendar);
+  // Calendar heatmap — defer one frame so container has its layout width
+  requestAnimationFrame(() => renderCalendarHeatmap(calData.calendar));
 
   // Day x Hour heatmap
   renderHeatmap(heatmap.heatmap);
@@ -1577,12 +2919,11 @@ async function loadCharts() {
 
 async function loadProjectHealth() {
   const projects = await api('/api/projects');
-  window._projList = projects.projects;  // show all projects, not just >= 2 sessions
-  renderProjectTable('sessions', true);
+  window._projList = projects.projects;
+  renderSessionTree();
 }
 
 // Project health table
-let _projSortKey = 'sessions', _projSortDesc = true;
 
 function fmtCostConv(p, allProjects) {
   const totalTokens = (p.total_input_tokens || 0) + (p.total_output_tokens || 0);
@@ -1600,57 +2941,6 @@ function fmtCostConv(p, allProjects) {
   return label;
 }
 
-function renderProjectTable(sortKey, desc) {
-  _projSortKey = sortKey || _projSortKey;
-  _projSortDesc = desc !== undefined ? desc : _projSortDesc;
-  const projList = window._projList || [];
-  const sortFns = {
-    name: (a, b) => a.project_name.localeCompare(b.project_name),
-    sessions: (a, b) => a.session_count - b.session_count,
-    completion: (a, b) => (a.completion_rate || 0) - (b.completion_rate || 0),
-    productivity: (a, b) => (a.avg_productivity || 0) - (b.avg_productivity || 0),
-    errors: (a, b) => (a.total_errors || 0) - (b.total_errors || 0),
-    tokens: (a, b) => ((a.total_input_tokens||0)+(a.total_output_tokens||0)) - ((b.total_input_tokens||0)+(b.total_output_tokens||0)),
-    cost: (a, b) => {
-      const ta = a.session_count ? ((a.total_input_tokens||0)+(a.total_output_tokens||0))/a.session_count : 0;
-      const tb = b.session_count ? ((b.total_input_tokens||0)+(b.total_output_tokens||0))/b.session_count : 0;
-      return ta - tb;
-    },
-  };
-  const sorted = [...projList].sort((a, b) => {
-    const v = (sortFns[_projSortKey] || sortFns.sessions)(a, b);
-    return _projSortDesc ? -v : v;
-  });
-  const tbody = document.querySelector('#project-health-table tbody');
-  tbody.innerHTML = sorted.slice(0, 15).map(p => {
-    const short = shortProject(p.project_name);
-    const prod = p.avg_productivity;
-    const rowCls = (prod != null && prod < 0.4) ? 'row-red' : (prod != null && prod < 0.6 ? 'row-amber' : '');
-    return `<tr class="${rowCls}">
-      <td>${short}</td>
-      <td>${p.session_count}</td>
-      <td>${p.completion_rate != null ? fmtPct(p.completion_rate) : '-'}</td>
-      <td style="color:${prod != null ? (prod >= 0.7 ? 'var(--green)' : prod >= 0.4 ? 'var(--yellow)' : 'var(--red)') : 'var(--text-dim)'}">${prod != null ? fmtPct(prod) : '-'}</td>
-      <td>${p.total_errors || 0}</td>
-      <td>${fmtTokens((p.total_input_tokens||0)+(p.total_output_tokens||0))}</td>
-      <td>${fmtCostConv(p, projList)}</td>
-    </tr>`;
-  }).join('');
-  // Update sort indicators on headers
-  document.querySelectorAll('#project-health-table th[data-sort]').forEach(th => {
-    const base = th.textContent.replace(/ [\u25B2\u25BC]$/, '');
-    th.textContent = base + (th.dataset.sort === _projSortKey ? (_projSortDesc ? ' \u25BC' : ' \u25B2') : '');
-    th.style.color = th.dataset.sort === _projSortKey ? 'var(--text)' : '';
-  });
-}
-
-document.getElementById('project-health-table').addEventListener('click', e => {
-  const th = e.target.closest('th[data-sort]');
-  if (!th) return;
-  const key = th.dataset.sort;
-  const desc = _projSortKey === key ? !_projSortDesc : true;
-  renderProjectTable(key, desc);
-});
 
 function renderCalendarHeatmap(data) {
   const container = document.getElementById('calendar-container');
@@ -1683,11 +2973,9 @@ function renderCalendarHeatmap(data) {
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - (52 * 7 + dayOfWeek));
 
-  const cellSize = 11;
-  const cellGap = 2;
-  const step = cellSize + cellGap;
   const labelWidth = 28;
   const headerHeight = 16;
+  const cellGap = 2;
   const dayLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 
   // Count weeks
@@ -1705,6 +2993,10 @@ function renderCalendarHeatmap(data) {
     current.setDate(current.getDate() + 1);
   }
   if (weekCells.length) weeks.push(weekCells);
+
+  // Use 13px cells to match the day/hour heatmap cell size
+  const cellSize = 13;
+  const step = cellSize + cellGap;
 
   const svgWidth = labelWidth + weeks.length * step + 4;
   const svgHeight = headerHeight + 7 * step + 4;
@@ -1795,8 +3087,14 @@ function renderHeatmap(data) {
   const grid = {};
   data.forEach(d => { grid[d.day + '-' + d.hour] = d; });
 
-  const accentColor = getCSSVar('--accent');
-  const emptyBg = getCSSVar('--surface2');
+  const isLightHm = document.documentElement.hasAttribute('data-theme');
+  const hmGreen = isLightHm ? ['#9be9a8','#40c463','#30a14e','#216e39'] : ['#0e4429','#006d32','#26a641','#39d353'];
+  const emptyBg = isLightHm ? '#ebedf0' : getCSSVar('--surface2');
+  function hmColor(count, max) {
+    if (!count) return emptyBg;
+    const r = count / max;
+    return r <= 0.25 ? hmGreen[0] : r <= 0.5 ? hmGreen[1] : r <= 0.75 ? hmGreen[2] : hmGreen[3];
+  }
 
   let html = '<div class="heatmap"><div></div>';
   for (let h = 0; h < 24; h++) html += `<div class="heatmap-header">${h}</div>`;
@@ -1806,7 +3104,7 @@ function renderHeatmap(data) {
       const cell = grid[d + '-' + h];
       const count = cell ? cell.count : 0;
       const intensity = count / maxCount;
-      const bg = count > 0 ? `color-mix(in srgb, ${accentColor} ${(15 + intensity * 75).toFixed(0)}%, transparent)` : emptyBg;
+      const bg = hmColor(count, maxCount);
       html += `<div class="heatmap-cell" style="background:${bg}" title="${days[d]} ${h}:00 - ${count} sessions">${count || ''}</div>`;
     }
   }
@@ -1918,12 +3216,24 @@ async function init() {
   await loadVerdict();
 
   stepEl.textContent = 'Loading prescriptions...';
-  barEl.style.width = '80%';
+  barEl.style.width = '75%';
   await loadChangeCards();
 
+  stepEl.textContent = 'Loading synthesis...';
+  barEl.style.width = '80%';
+  await loadSynthesis();
+
+  stepEl.textContent = 'Loading highlights...';
+  barEl.style.width = '85%';
+  await loadHighlights();
+
   stepEl.textContent = 'Loading sessions...';
-  barEl.style.width = '90%';
+  barEl.style.width = '88%';
   await loadSessions(false);
+
+  stepEl.textContent = 'Loading charts...';
+  barEl.style.width = '93%';
+  await Promise.all([loadCharts(), loadProjectHealth(), loadSkills(), loadFrictionCategories()]);
 
   // Complete!
   stepEl.textContent = 'Ready!';
@@ -1994,15 +3304,23 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
+  // / - Focus search
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    const si = document.getElementById('filter-search');
+    if (si) { si.focus(); si.select(); }
+  }
+
   // ? - Show help
   if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     alert(`Keyboard Shortcuts:
 
 r - Run LLM Judge
+/ - Focus search
 j - Next session
 k - Previous session
-e - Export (coming soon)
+e - Export HTML
 ? - Show this help`);
   }
 });
@@ -2047,14 +3365,10 @@ async function updateBackgroundStatus(status) {
       barEl.style.width = '100%';
       countEl.textContent = '';
 
-      await Promise.all([loadVerdict(), loadChangeCards()]);
+      await Promise.all([loadVerdict(), loadChangeCards(), loadSynthesis(), loadHighlights()]);
       expandedSessionId = null;
       await loadSessions(false);
-      chartsLoaded = false;
-      projectsLoaded = false;
-      skillsLoaded = false;
-      const activeTab = document.querySelector('.tab-btn.active');
-      if (activeTab) switchTab(activeTab.dataset.tab);
+      await Promise.all([loadCharts(), loadProjectHealth(), loadSkills(), loadFrictionCategories()]);
 
       setTimeout(() => { progressEl.style.display = 'none'; }, 2000);
     } else {

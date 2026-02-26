@@ -502,6 +502,15 @@ a:hover { text-decoration: underline; }
 .chart-card h3 { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 .chart-wrap { position: relative; height: 240px; flex: 1; }
 
+/* Horizontal bar charts */
+.bc-card { background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius); padding: 12px; }
+.bc-card h3 { font-size: 12px; font-weight: 600; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+.bc-row { display: flex; align-items: center; margin-bottom: 5px; }
+.bc-label { width: 120px; font-size: 11px; color: var(--text-sec); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-track { flex: 1; height: 6px; background: var(--inset); border-radius: 3px; margin: 0 8px; }
+.bc-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.bc-value { width: 36px; font-size: 11px; font-weight: 500; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+
 /* Session tree */
 .st-project { background: var(--surface); border: 1px solid var(--border-muted); border-radius: var(--radius); margin-bottom: 4px; overflow: hidden; }
 .st-proj-header { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; user-select: none; transition: background 0.1s; }
@@ -1259,6 +1268,7 @@ tr:hover td { background: var(--surface2); }
 
   <!-- TAB: Charts -->
   <div class="tab-content" id="tab-charts">
+    <div id="bar-charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"></div>
     <div id="activity-section">
       <div style="display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; margin-bottom:12px">
         <div class="chart-card">
@@ -2954,16 +2964,72 @@ function renderSkillBadges(skills) {
   return html;
 }
 
+function renderBarChart(title, items, color) {
+  if (!items.length) return '';
+  const max = items[0].value;
+  const rows = items.map(({label, value}) => {
+    const pct = max > 0 ? (value / max * 100).toFixed(1) : 0;
+    return `<div class="bc-row">
+      <div class="bc-label" title="${esc(label)}">${esc(label)}</div>
+      <div class="bc-track"><div class="bc-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bc-value">${value}</div>
+    </div>`;
+  }).join('');
+  return `<div class="bc-card"><h3>${esc(title)}</h3>${rows}</div>`;
+}
+
 async function loadCharts() {
-  const [heatmap, calData, sessData] = await Promise.all([
+  const [heatmap, calData, sessData, intentsData, toolsData, jStats, overview] = await Promise.all([
     api('/api/heatmap'),
     api('/api/heatmap/calendar'),
     api('/api/sessions?limit=50&sort=started_at+ASC'),
+    api('/api/intents'),
+    api('/api/tools'),
+    api('/api/judge-stats'),
+    api('/api/overview'),
   ]);
 
   const textDim = getCSSVar('--text-dim');
   const gridColor = getCSSVar('--border');
   const greenColor = getCSSVar('--green');
+
+  // Bar charts
+  const barGrid = document.getElementById('bar-charts-grid');
+  if (barGrid) {
+    // Intents
+    const intents = (intentsData.intents || [])
+      .filter(i => i.intent && i.intent !== 'unknown')
+      .map(i => ({ label: i.intent.replace(/_/g, ' '), value: i.count }))
+      .sort((a, b) => b.value - a.value).slice(0, 8);
+
+    // Top tools
+    const tools = (toolsData.tools || [])
+      .map(t => ({ label: t.tool_name, value: t.total_uses }))
+      .sort((a, b) => b.value - a.value).slice(0, 8);
+
+    // Outcomes
+    const od = jStats.outcome_distribution || {};
+    const outcomeOrder = ['completed', 'mostly_completed', 'partially_completed', 'failed', 'exploratory', 'abandoned'];
+    const outcomes = outcomeOrder
+      .filter(k => od[k] > 0)
+      .map(k => ({ label: k.replace(/_/g, ' '), value: od[k] }))
+      .sort((a, b) => b.value - a.value);
+
+    // Trajectory
+    const td = overview.trajectory_distribution || {};
+    const trajOrder = ['converged', 'mixed', 'drifted', 'thrashed', 'unknown'];
+    const trajectory = trajOrder
+      .filter(k => td[k] > 0)
+      .map(k => ({ label: k, value: td[k] }))
+      .sort((a, b) => b.value - a.value);
+
+    barGrid.innerHTML = [
+      renderBarChart('What You Worked On', intents, getCSSVar('--accent')),
+      renderBarChart('Top Tools Used', tools, getCSSVar('--cyan')),
+      outcomes.length ? renderBarChart('Session Outcomes', outcomes, getCSSVar('--purple')) : '',
+      trajectory.length ? renderBarChart('Session Trajectory', trajectory, getCSSVar('--green')) : '',
+    ].filter(Boolean).join('');
+  }
 
   // Productivity trend (judged sessions only)
   const sessArr = sessData.sessions.filter(s => s.productivity_ratio != null);

@@ -9,4 +9,6 @@ dist/
 *.db
 *.bak
 *.bak2
+*.backup
+.venv/
 .pytest_cache/

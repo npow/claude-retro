@@ -31,6 +31,162 @@ def set_worker(worker):
     _worker = worker
 
 
+# Priority-ordered patterns; first match wins, minimising "Other"
+_FRICTION_PATTERNS = [
+    ("Ignored User Instruction", [
+        "contrary to", "contrary to user", "despite user",
+        "despite being told", "despite the user",
+        "user explicitly", "user had explicitly", "user said not to",
+        "user said they", "user asked to remove", "user had told",
+        "user confirmed", "user clarified", "user preferred",
+        "user specified", "user corrected", "user redirected",
+        "user interrupted", "user had to point out",
+        "when user told", "when user said", "after user said",
+        "after the user", "user wanted", "user requested",
+        "continuing after", "still working on",
+        "questioning whether", "as user requested", "as directed",
+        "delegated", "instead of doing it himself",
+        "suggested user take action", "asked user to",
+        "user had already clarified", "user had clarified",
+        "user expected", "user's expectation",
+        "user stated:", "user said:", "user said ", "user pushed back",
+        "user had to", "were supposed to be", "implementing something different",
+    ]),
+    ("Repeated Failure", [
+        "consecutive turns", "consecutive failed", "multiple consecutive",
+        "consecutive", "cycle of failed", "without changing approach",
+        "multiple fail", "multiple attempt",
+        "repeated attempt", "required retry", "requiring recovery",
+        "tried the same", "same approach again",
+        "still failing after", "still not working after",
+        "across multiple turns", "multiple additional iteration",
+        "required multiple", "for 26 turns", "still insisted",
+        "circular debugging", "repeated error", "repeated the same",
+        "going in circles", "kept trying", "spent 52 turns", "spent 100+",
+    ]),
+    ("Misunderstood Request", [
+        "misunderstood", "misinterpreted", "confusion about",
+        "confused about", "confused the", "not understanding",
+        "not understand", "confused why", "scope mismatch",
+        "misunderstanding that", "misunderstand",
+        "expectation mismatch", "mismatch; original",
+        "user's actual concern", "user actually wanted",
+        "user's actual need", "actual need was",
+        "rather than brainstorming", "conflated",
+        "interpreted this as", "user pivoted",
+    ]),
+    ("Jumped Ahead Without Clarifying", [
+        "without asking clarifying", "without first asking",
+        "without clarifying", "without first understanding",
+        "should have asked", "should have clarified",
+        "should have requested", "should have first",
+        "should have researched", "should have figured",
+        "before asking", "before clarifying",
+        "before understanding the core", "before understanding",
+        "jumped directly into", "jumped directly to",
+        "jumped to", "dove into",
+        "without establishing", "without validating",
+        "without first validating", "without explaining",
+        "without explaining approach",
+        "proceeded without", "proceeded before",
+        "without reading", "without understanding",
+        "without requesting", "rather than first",
+        "launched into", "without profiling",
+        "before root caus", "before testing",
+        "without first explaining", "without explicitly",
+        "should have used", "before applying",
+        "rather than examining", "should have prompted",
+        "should have been", "without clear justification",
+    ]),
+    ("Wrong Approach", [
+        "wrong approach", "wrong method", "wrong strategy", "wrong testing",
+        "wrong command", "wrong tool", "wrong direction", "wrong installation",
+        "wrong import", "wrong source", "wrong location", "wrong path",
+        "attempted wrong", "proposed mock", "without properly root caus",
+        "without root caus", "incorrect approach", "instead of", "wrong ",
+        "entered plan mode", "pursuing strategy", "unnecessary complex",
+        "slower approach", "when direct", "requires ci modification",
+        "to symlink", "symlink approach", "over-engineer",
+        "veered into", "veered away", "scope creep",
+        "too cautious", "too conservative", "hesitant to proceed",
+        "inappropriate for", "is inappropriate",
+        "beyond scope", "ci modification", "architectural mismatch",
+        "diverged to", "led to regressions",
+        "rather than integrated", "unexpected line",
+        "rather than scoped", "rather than examining actual",
+    ]),
+    ("Premature Completion", [
+        "claimed thorough", "claimed everything works",
+        "claimed local testing", "claimed no issues",
+        "marked all tasks done",
+        "without actually testing", "without actually running",
+        "without end-to-end", "without running tests",
+        "false impression of", "comprehensive enough",
+        "claimed complete", "without verifying in",
+        "without fully testing",
+    ]),
+    ("Incomplete Work", [
+        "never delivered", "never synthesized", "never answered",
+        "left placeholder", "left todos", "still todos",
+        "abruptly with no", "ended abruptly",
+        "without completing", "without delivering",
+        "session ended abruptly", "without any response",
+        "left incomplete", "left unimplemented",
+        "left outstanding", "never completed",
+        "no output after", "appeared blocked", "no visible progress",
+        "produced no output", "final turns diverged",
+    ]),
+    ("Missed Issues", [
+        "didn't", "did not", "failed to", "forgot to", "overlooked",
+        "without identifying", "without checking", "without verifying",
+        "not check", "not identify", "not recogni", "incomplete",
+        "missed the", "missed that", "missed a",
+        "not converting", "not installing", "not putting", "not finding",
+        "not debugging", "unable to", "not able to",
+        "not looking at", "needed user to provide",
+        "not tracking", "not using correct",
+        "weren't caught", "not caught",
+        "not proactively", "hadn't anticipated",
+        "not comprehensive", "without running",
+        "wasn't caught", "without proactively",
+        "lacked context", "no automated",
+    ]),
+    ("Buggy Code", [
+        "incorrect", "incorrectly", "duplicate", "would incorrectly",
+        "logic error", "wrong output", "wrong result", "but this was",
+        "causing attri", "causing type", "causing test", "causing import",
+        "hardcoded", "hard-coded", "committed unwanted", "commented out critical",
+        "too implementation-dependent", "deployed without adequate",
+        "caused segmentation", "caused typeerror", "caused crash",
+        "still inconsistent", "functionality broke",
+        "hardcoding", "user caught this", "was empty",
+    ]),
+    ("Wrong Assumption", [
+        "assumed ", "incorrect assumption", "assumption about",
+        "stated that", "claimed that", "confidently stated",
+        "asserted that", "second-guess", "misunderstanding that",
+        "claimed no", "false impression",
+        "speculated", "assuming it was", "user questioned whether",
+    ]),
+    ("User Rejected Action", [
+        "user rejected", "user cancelled", "user denied",
+        "refused", "permission denied",
+        "rejected by user as",
+    ]),
+    ("Tool/Bash Error", [
+        "bash error", "bash command error", "tool error", "command error",
+        "read tool error", "edit error",
+        "git operation failed", "commit commands failed", "git commit failed",
+        "hit minio", "connection refused", "timeout",
+        "webfetch", "fetch error", "requiring vpn", "requiring authentication",
+        "needed to be killed", "errored out",
+        "tool failed", "connection issues", "mcp had",
+        "failed with error", "which errored",
+        "execution errors", "bash access to",
+    ]),
+]
+
+
 @app.route("/api/status")
 def api_status():
     if _worker is None:
@@ -297,7 +453,8 @@ def api_session_detail(session_id):
 
     tools = conn.execute(
         """
-        SELECT tool_name, use_count, error_count
+        SELECT tool_name, use_count, error_count,
+               COALESCE(total_duration_ms, 0), COALESCE(avg_duration_ms, 0)
         FROM session_tool_usage WHERE session_id = ?
         ORDER BY use_count DESC
     """,
@@ -317,7 +474,11 @@ def api_session_detail(session_id):
         "session": _row_to_dict(session, session_cols),
         "features": _row_to_dict(features, feature_cols) if features else {},
         "tools": [
-            {"tool_name": t[0], "use_count": t[1], "error_count": t[2]} for t in tools
+            {
+                "tool_name": t[0], "use_count": t[1], "error_count": t[2],
+                "total_duration_ms": t[3], "avg_duration_ms": round(t[4]) if t[4] else 0,
+            }
+            for t in tools
         ],
     }
     if judgment:
@@ -812,6 +973,27 @@ def api_refresh():
     return jsonify({"ok": True, "concurrency": concurrency})
 
 
+@app.route("/api/fill-narratives", methods=["POST"])
+def api_fill_narratives():
+    """Re-judge sessions that are missing narrative text (non-blocking)."""
+    if _worker is None:
+        return jsonify({"error": "No background worker available"}), 500
+    if _worker.is_busy:
+        return jsonify({"ok": False, "message": "Worker is busy — try again later"}), 409
+    conn = get_conn()
+    missing = conn.execute("""
+        SELECT COUNT(*) FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE (j.narrative IS NULL OR j.narrative = '') AND s.turn_count >= 1
+    """).fetchone()[0]
+    if missing == 0:
+        return jsonify({"ok": True, "message": "All sessions already have narratives", "count": 0})
+    body = request.get_json(silent=True) or {}
+    concurrency = max(1, min(32, int(body.get("concurrency", 12))))
+    _worker.request_fill_narratives(concurrency=concurrency)
+    return jsonify({"ok": True, "count": missing, "concurrency": concurrency})
+
+
 @app.route("/api/judgments/stats")
 def api_judgment_stats():
     conn = get_conn()
@@ -840,7 +1022,8 @@ def api_judgment_stats():
             AVG(j.prompt_completeness) as avg_completeness,
             AVG(j.productivity_ratio) as avg_productivity,
             AVG(j.misalignment_count) as avg_misalignments,
-            SUM(CASE WHEN j.misalignment_count > 0 THEN 1 ELSE 0 END) as sessions_with_misalignment
+            SUM(CASE WHEN j.misalignment_count > 0 THEN 1 ELSE 0 END) as sessions_with_misalignment,
+            SUM(CASE WHEN j.narrative IS NOT NULL AND j.narrative != '' THEN 1 ELSE 0 END) as narrative_count
         {_jfilter}
     """).fetchone()
 
@@ -853,6 +1036,7 @@ def api_judgment_stats():
             "avg_productivity": round(avgs[2] or 0, 3),
             "avg_misalignments": round(avgs[3] or 0, 2),
             "misalignment_rate": round((avgs[4] or 0) / total, 3) if total else 0,
+            "narrative_count": avgs[5] or 0,
         }
     )
 
@@ -1344,6 +1528,160 @@ def api_synthesis():
     return jsonify({"synthesis": result})
 
 
+@app.route("/api/synthesis/delta")
+def api_synthesis_delta():
+    """Return delta between current and previous synthesis run."""
+    conn = get_conn()
+
+    # Current stats (live from DB)
+    cur = conn.execute("""
+        SELECT COUNT(*) as sess, AVG(productivity_ratio) as prod,
+               AVG(misalignment_count) as mis
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+    """).fetchone()
+    cur_sessions = cur[0] or 0
+    cur_prod = cur[1] or 0.0
+    cur_mis = cur[2] or 0.0
+
+    # Previous run from synthesis_history
+    prev = conn.execute("""
+        SELECT session_count, productivity_avg, friction_counts, generated_at
+        FROM synthesis_history ORDER BY id DESC LIMIT 1
+    """).fetchone()
+
+    if not prev:
+        return jsonify({"delta": None, "message": "No previous run to compare"})
+
+    prev_sessions = prev[0] or 0
+    prev_prod = prev[1] or 0.0
+    prev_generated_at = prev[3]
+
+    prev_friction = {}
+    if prev[2]:
+        try:
+            prev_friction = json.loads(prev[2])
+        except Exception:
+            pass
+
+    cur_friction_row = conn.execute("""
+        SELECT COUNT(*), AVG(misalignment_count)
+        FROM session_judgments j JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+    """).fetchone()
+
+    prod_delta = cur_prod - prev_prod
+    sessions_delta = cur_sessions - prev_sessions
+    mis_delta = cur_mis - (prev_friction.get("avg_per_session") or cur_mis)
+
+    # Skill level changes
+    skill_rows = conn.execute("SELECT dimension_id, current_level FROM skill_profile").fetchall()
+    cur_skills = {r[0]: r[1] for r in skill_rows}
+    prev_skills = {}
+    prev_synth = conn.execute("""
+        SELECT skill_levels FROM synthesis_history ORDER BY id DESC LIMIT 1
+    """).fetchone()
+    if prev_synth and prev_synth[0]:
+        try:
+            prev_skills = json.loads(prev_synth[0])
+        except Exception:
+            pass
+    skill_changes = {}
+    for dim, level in cur_skills.items():
+        prev_level = prev_skills.get(dim, level)
+        if level != prev_level:
+            skill_changes[dim] = {"from": prev_level, "to": level}
+
+    return jsonify({
+        "delta": {
+            "previous_run": prev_generated_at,
+            "sessions_delta": sessions_delta,
+            "productivity_delta": round(prod_delta, 3),
+            "misalignment_delta": round(mis_delta, 2),
+            "skill_changes": skill_changes,
+            "cur_productivity": round(cur_prod, 3),
+            "prev_productivity": round(prev_prod, 3),
+        }
+    })
+
+
+@app.route("/api/sessions-by-friction")
+def api_sessions_by_friction():
+    """Return sessions matching a given friction type, for drill-through."""
+    friction_type = request.args.get("type", "")
+    if not friction_type:
+        return jsonify({"sessions": []})
+
+    conn = get_conn()
+
+    # Find keyword patterns for this friction type
+    patterns = []
+    for name, keywords in _FRICTION_PATTERNS:
+        if name == friction_type:
+            patterns = keywords
+            break
+
+    if not patterns and friction_type != "Other":
+        return jsonify({"sessions": [], "error": "Unknown friction type"})
+
+    # Fetch all sessions with misalignments, then filter in Python
+    rows = conn.execute("""
+        SELECT j.session_id, j.misalignments, j.productivity_ratio, j.outcome,
+               j.narrative, j.prompt_summary, s.project_name, s.started_at,
+               s.duration_seconds, s.turn_count
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.misalignments IS NOT NULL AND j.misalignments != '[]'
+          AND s.turn_count >= 1
+        ORDER BY j.misalignment_count DESC
+        LIMIT 200
+    """).fetchall()
+
+    matched = []
+    for row in rows:
+        sid, mis_json, prod, outcome, narrative, summary, proj, started, dur, turns = row
+        try:
+            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+        except Exception:
+            items = []
+
+        matching_items = []
+        for raw_desc in items:
+            # misalignments can be dicts {turn, description} or plain strings
+            desc = raw_desc.get("description", "") if isinstance(raw_desc, dict) else str(raw_desc)
+            desc_lower = desc.lower()
+            if friction_type == "Other":
+                # Check if it matches NO named pattern
+                is_other = True
+                for _, kws in _FRICTION_PATTERNS:
+                    if any(k in desc_lower for k in kws):
+                        is_other = False
+                        break
+                if is_other:
+                    matching_items.append(desc)
+            else:
+                if any(k in desc_lower for k in patterns):
+                    matching_items.append(desc)
+
+        if matching_items:
+            matched.append({
+                "session_id": sid,
+                "project": proj,
+                "productivity": round(prod or 0, 2),
+                "outcome": outcome,
+                "narrative": narrative,
+                "prompt_summary": summary,
+                "started_at": started,
+                "duration_min": round((dur or 0) / 60),
+                "turns": turns,
+                "matching_frictions": matching_items[:3],
+            })
+
+    matched.sort(key=lambda x: x["productivity"])  # worst first
+    return jsonify({"sessions": matched[:20], "type": friction_type, "total": len(matched)})
+
+
 @app.route("/api/sessions/<session_id>/narrative")
 def api_session_narrative(session_id):
     """Return the rich narrative for a session."""
@@ -1532,6 +1870,321 @@ def api_session_highlights():
     return jsonify({"highlights": highlights[:5]})
 
 
+@app.route("/api/time-of-day")
+def api_time_of_day():
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT
+            CASE
+                WHEN CAST(strftime('%H', timestamp_utc) AS INTEGER) BETWEEN 6 AND 11 THEN 'Morning 6-12'
+                WHEN CAST(strftime('%H', timestamp_utc) AS INTEGER) BETWEEN 12 AND 17 THEN 'Afternoon 12-18'
+                WHEN CAST(strftime('%H', timestamp_utc) AS INTEGER) BETWEEN 18 AND 23 THEN 'Evening 18-24'
+                ELSE 'Night 0-6'
+            END as period,
+            COUNT(*) as count
+        FROM raw_entries
+        WHERE entry_type = 'user'
+          AND user_text_length > 0
+          AND timestamp_utc IS NOT NULL
+        GROUP BY period
+        ORDER BY count DESC
+    """).fetchall()
+    return jsonify({"time_of_day": [{"period": r[0], "count": r[1]} for r in rows]})
+
+
+@app.route("/api/response-times")
+def api_response_times():
+    """User response latency: time from assistant message to next user message."""
+    conn = get_conn()
+
+    # Fetch all inter-message deltas in the plausible human response range
+    delta_rows = conn.execute("""
+        WITH ordered AS (
+            SELECT session_id, entry_type, timestamp_utc,
+                LAG(timestamp_utc) OVER (PARTITION BY session_id ORDER BY timestamp_utc) as prev_ts,
+                LAG(entry_type) OVER (PARTITION BY session_id ORDER BY timestamp_utc) as prev_type
+            FROM raw_entries
+            WHERE timestamp_utc IS NOT NULL AND entry_type IN ('user', 'assistant')
+        )
+        SELECT CAST((julianday(timestamp_utc) - julianday(prev_ts)) * 86400 AS INTEGER) as delta_s
+        FROM ordered
+        WHERE entry_type = 'user' AND prev_type = 'assistant'
+          AND julianday(timestamp_utc) > julianday(prev_ts)
+          AND CAST((julianday(timestamp_utc) - julianday(prev_ts)) * 86400 AS INTEGER) BETWEEN 1 AND 86400
+        ORDER BY delta_s
+    """).fetchall()
+
+    deltas = [r[0] for r in delta_rows]
+    if not deltas:
+        return jsonify({"distribution": [], "avg_seconds": 0, "median_seconds": 0})
+
+    buckets = [('2-10s', 2, 10), ('10-30s', 10, 30), ('30s-1m', 30, 60),
+               ('1-2m', 60, 120), ('2-5m', 120, 300), ('5-15m', 300, 900), ('>15m', 900, 999999)]
+    dist = [{"label": b, "count": sum(1 for d in deltas if lo <= d < hi)} for b, lo, hi in buckets]
+    avg_s = sum(deltas) / len(deltas)
+    median_s = deltas[len(deltas) // 2]
+
+    return jsonify({
+        "distribution": dist,
+        "avg_seconds": round(avg_s, 1),
+        "median_seconds": round(median_s, 1),
+    })
+
+
+@app.route("/api/multi-clauding")
+def api_multi_clauding():
+    """Detect overlapping concurrent Claude Code sessions (multi-clauding).
+
+    Two sessions overlap if they both have user messages within the same 5-minute window.
+    This is more accurate than comparing session start/end times which span hours.
+    """
+    conn = get_conn()
+
+    # Find 5-minute windows where 2+ sessions had user activity simultaneously
+    # Group user messages into 5-minute buckets and count distinct sessions per bucket
+    overlap_rows = conn.execute("""
+        WITH bucketed AS (
+            SELECT
+                session_id,
+                CAST(strftime('%s', timestamp_utc) AS INTEGER) / 300 as bucket
+            FROM raw_entries
+            WHERE entry_type = 'user'
+              AND user_text_length > 0
+              AND session_id IS NOT NULL
+              AND timestamp_utc IS NOT NULL
+            GROUP BY session_id, bucket
+        ),
+        busy_buckets AS (
+            SELECT bucket, COUNT(DISTINCT session_id) as concurrent_sessions,
+                   GROUP_CONCAT(DISTINCT session_id) as session_list
+            FROM bucketed
+            GROUP BY bucket
+            HAVING COUNT(DISTINCT session_id) >= 2
+        )
+        SELECT COUNT(*) as overlap_events,
+               COUNT(DISTINCT session_id) as sessions_involved
+        FROM busy_buckets
+        JOIN bucketed ON bucketed.bucket = busy_buckets.bucket
+    """).fetchone()
+
+    overlap_events = overlap_rows[0] or 0
+    sessions_involved = overlap_rows[1] or 0
+
+    total_msgs = conn.execute(
+        "SELECT COUNT(*) FROM raw_entries WHERE entry_type='user' AND user_text_length > 0"
+    ).fetchone()[0]
+
+    # Overlap message count = messages in sessions that had any concurrent activity
+    overlap_msg_count = conn.execute("""
+        WITH bucketed AS (
+            SELECT session_id,
+                   CAST(strftime('%s', timestamp_utc) AS INTEGER) / 300 as bucket
+            FROM raw_entries
+            WHERE entry_type = 'user' AND user_text_length > 0
+              AND session_id IS NOT NULL AND timestamp_utc IS NOT NULL
+            GROUP BY session_id, bucket
+        ),
+        overlapping_sessions AS (
+            SELECT DISTINCT b.session_id
+            FROM bucketed b
+            JOIN bucketed b2 ON b.bucket = b2.bucket AND b.session_id != b2.session_id
+        )
+        SELECT COUNT(*) FROM raw_entries
+        WHERE session_id IN (SELECT session_id FROM overlapping_sessions)
+          AND entry_type = 'user'
+    """).fetchone()[0]
+
+    pct = min(round(overlap_msg_count / total_msgs * 100) if total_msgs else 0, 100)
+    return jsonify({
+        "overlap_events": overlap_events,
+        "sessions_involved": sessions_involved,
+        "sessions_involved_pct": round(sessions_involved * 100 / max(conn.execute(
+            "SELECT COUNT(DISTINCT session_id) FROM sessions"
+        ).fetchone()[0], 1)),
+    })
+
+
+@app.route("/api/friction")
+def api_friction():
+    """Friction type distribution from session judgments."""
+    conn = get_conn()
+
+    # Parse misalignments JSON arrays to extract friction categories
+    rows = conn.execute("""
+        SELECT misalignments
+        FROM session_judgments
+        WHERE misalignments IS NOT NULL AND misalignments != '' AND misalignments != '[]'
+    """).fetchall()
+
+    import json as _json
+    from collections import Counter
+
+    # Priority-ordered patterns; first match wins, minimising "Other"
+    # Priority-ordered patterns defined at module level
+
+    counter: Counter = Counter()
+    for (raw,) in rows:
+        try:
+            descs = _json.loads(raw)
+            if not isinstance(descs, list):
+                continue
+            for item in descs:
+                desc_l = (item.get("description", "") if isinstance(item, dict) else str(item)).lower()
+                matched = False
+                for label, keywords in _FRICTION_PATTERNS:
+                    if any(kw in desc_l for kw in keywords):
+                        counter[label] += 1
+                        matched = True
+                        break
+                if not matched:
+                    counter["Other"] += 1
+        except Exception:
+            continue
+
+    # Sort by count descending, but always put "Other" last
+    sorted_items = sorted(
+        ((k, v) for k, v in counter.items() if k != "Other"),
+        key=lambda x: -x[1]
+    )
+    if "Other" in counter:
+        sorted_items.append(("Other", counter["Other"]))
+    items = [{"label": k, "count": v} for k, v in sorted_items]
+    return jsonify({"friction": items})
+
+
+@app.route("/api/tool-errors")
+def api_tool_errors():
+    """Tool error type distribution."""
+    conn = get_conn()
+
+    # Check if tool_result_error_type column exists
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(raw_entries)").fetchall()}
+    if "tool_result_error_type" not in cols:
+        return jsonify({"tool_errors": [], "needs_reingest": True})
+
+    rows = conn.execute("""
+        SELECT tool_result_error_type, COUNT(*) as count
+        FROM raw_entries
+        WHERE tool_result_error = 1 AND tool_result_error_type IS NOT NULL
+        GROUP BY tool_result_error_type
+        ORDER BY count DESC
+    """).fetchall()
+    return jsonify({
+        "tool_errors": [{"label": r[0].replace("_", " ").title(), "count": r[1]} for r in rows],
+        "needs_reingest": len(rows) == 0,
+    })
+
+
+@app.route("/api/languages")
+def api_languages():
+    """Language breakdown from file edits."""
+    conn = get_conn()
+
+    # Check if session_languages table exists
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "session_languages" not in tables:
+        return jsonify({"languages": [], "needs_reingest": True})
+
+    # Only recognised code/config/markup extensions — no images, binaries, or tool outputs
+    _CODE_EXTS = {
+        "py", "ts", "tsx", "js", "jsx", "mjs", "cjs",
+        "html", "htm", "css", "scss", "sass",
+        "md", "mdx", "rst",
+        "json", "yaml", "yml", "toml", "ini", "cfg", "env",
+        "sh", "bash", "zsh", "fish",
+        "go", "rs", "rb", "java", "kt", "swift", "c", "cpp", "h", "hpp",
+        "sql", "prisma", "graphql", "gql",
+        "ipynb", "r", "scala", "clj", "ex", "exs", "erl", "hs", "lua",
+        "tf", "hcl", "dockerfile",
+    }
+    _LABEL_MAP = {
+        "py": "Python", "ts": "TypeScript", "tsx": "TSX", "js": "JavaScript",
+        "jsx": "JSX", "mjs": "JavaScript", "cjs": "JavaScript",
+        "md": "Markdown", "mdx": "MDX", "rst": "reStructuredText",
+        "html": "HTML", "htm": "HTML", "css": "CSS", "scss": "SCSS", "sass": "Sass",
+        "json": "JSON", "yaml": "YAML", "yml": "YAML", "sh": "Shell",
+        "bash": "Shell", "zsh": "Shell", "go": "Go", "rs": "Rust",
+        "java": "Java", "rb": "Ruby", "kt": "Kotlin", "swift": "Swift",
+        "c": "C", "cpp": "C++", "h": "C/C++", "sql": "SQL",
+        "toml": "TOML", "ipynb": "Notebook", "tf": "Terraform", "hcl": "HCL",
+        "dockerfile": "Dockerfile", "graphql": "GraphQL", "gql": "GraphQL",
+        "prisma": "Prisma", "scala": "Scala", "r": "R",
+    }
+
+    rows = conn.execute("""
+        SELECT extension, SUM(file_count) as total
+        FROM session_languages
+        WHERE extension != ''
+        GROUP BY extension
+        ORDER BY total DESC
+        LIMIT 50
+    """).fetchall()
+
+    items = [
+        {"label": _LABEL_MAP.get(r[0], r[0].upper()), "count": r[1]}
+        for r in rows
+        if r[0] in _CODE_EXTS
+    ][:12]
+    return jsonify({"languages": items, "needs_reingest": len(items) == 0})
+
+
+@app.route("/api/bash-commands")
+def api_bash_commands():
+    """Top bash commands by extracting the first word/program from bash tool_input_preview."""
+    import re as _re
+    conn = get_conn()
+
+    # Check if tool_input_preview column exists
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(raw_entries)").fetchall()}
+    if "tool_input_preview" not in cols:
+        return jsonify({"bash_commands": [], "needs_reingest": True})
+
+    rows = conn.execute("""
+        SELECT tool_input_preview
+        FROM raw_entries
+        WHERE tool_names LIKE '%Bash%'
+          AND tool_input_preview IS NOT NULL
+          AND tool_input_preview != ''
+          AND is_tool_result = 0
+    """).fetchall()
+
+    # Extract the first actual command from the preview
+    _STRIP_PREFIXES = ("nohup ", "sudo ", "eval ", "env ", "time ")
+    from collections import Counter
+    cmd_counter: Counter = Counter()
+
+    for (preview,) in rows:
+        if not preview:
+            continue
+        # Strip leading whitespace, shell var assignments like FOO=bar cmd
+        cmd = preview.strip()
+        # Strip env var assignments: VAR=value cmd -> cmd
+        cmd = _re.sub(r'^([A-Z_][A-Z0-9_]*=[^\s]*\s+)+', '', cmd)
+        # Strip common wrappers
+        for prefix in _STRIP_PREFIXES:
+            if cmd.startswith(prefix):
+                cmd = cmd[len(prefix):]
+        # Get first token
+        first = _re.split(r'[\s|;&]', cmd)[0].strip()
+        # Strip shell path prefix (e.g., /usr/bin/grep -> grep)
+        if '/' in first:
+            first = first.rsplit('/', 1)[-1]
+        # Normalise
+        first = first.lower().strip('"\' ')
+        if not first or len(first) > 40:
+            continue
+        # Skip numbers and special chars only
+        if not _re.search(r'[a-z]', first):
+            continue
+        cmd_counter[first] += 1
+
+    items = [
+        {"label": cmd, "value": count}
+        for cmd, count in cmd_counter.most_common(20)
+    ]
+    return jsonify({"bash_commands": items})
+
+
 @app.route("/api/heatmap")
 def api_heatmap():
     conn = get_conn()
@@ -1587,3 +2240,819 @@ def api_heatmap_calendar():
             ],
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# New features: Groundhog Day, Lost Hours, Streaks, etc.
+# ---------------------------------------------------------------------------
+
+def _categorize_friction(desc_lower: str) -> str:
+    """Categorize a misalignment description into a friction pattern name."""
+    for name, keywords in _FRICTION_PATTERNS:
+        if any(kw in desc_lower for kw in keywords):
+            return name
+    return "Other"
+
+
+@app.route("/api/groundhog-day")
+def api_groundhog_day():
+    """Detect repeated friction patterns across sessions (Groundhog Day detector)."""
+    conn = get_conn()
+
+    rows = conn.execute("""
+        SELECT j.session_id, j.misalignments, j.user_quote, j.prompt_summary,
+               s.project_name, s.started_at
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.misalignments IS NOT NULL AND j.misalignments != '[]'
+          AND s.turn_count >= 3
+          AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
+        ORDER BY s.started_at
+    """).fetchall()
+
+    # Group by (project_name, friction_category)
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for sid, mis_json, user_quote, prompt_summary, project, started_at in rows:
+        try:
+            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+        except Exception:
+            continue
+        short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        seen_cats = set()
+        for item in items:
+            desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+            cat = _categorize_friction(desc.lower())
+            if cat not in seen_cats:
+                seen_cats.add(cat)
+                key = (short_project, cat)
+                groups[key].append({
+                    "session_id": sid,
+                    "date": str(started_at)[:10] if started_at else "",
+                    "user_quote": (user_quote or "")[:120],
+                    "prompt_summary": (prompt_summary or "")[:100],
+                })
+
+    loops = []
+    for (project, pattern), sessions in groups.items():
+        if len(sessions) >= 2:
+            loops.append({
+                "project": project,
+                "pattern": pattern,
+                "count": len(sessions),
+                "sessions": sessions[-5:],  # most recent 5
+            })
+
+    loops.sort(key=lambda x: -x["count"])
+    return jsonify({"loops": loops})
+
+
+@app.route("/api/lost-hours")
+def api_lost_hours():
+    """Calculate cumulative hours lost to friction by category."""
+    conn = get_conn()
+
+    rows = conn.execute("""
+        SELECT j.waste_turns, j.misalignments, s.duration_seconds, s.turn_count,
+               j.estimated_cost_usd
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.waste_turns > 0 AND s.turn_count > 0
+          AND s.duration_seconds > 0
+          AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
+    """).fetchall()
+
+    from collections import defaultdict
+    cat_data = defaultdict(lambda: {"waste_hours": 0.0, "sessions": 0, "cost_usd": 0.0})
+    total_waste_hours = 0.0
+    total_cost_usd = 0.0
+
+    for waste_turns, mis_json, dur_s, turn_count, cost_usd in rows:
+        turn_duration_s = dur_s / turn_count if turn_count > 0 else 0
+        session_waste_hours = (waste_turns * turn_duration_s) / 3600.0
+
+        # Distribute waste proportionally across misalignment categories in session
+        cats_in_session = set()
+        if mis_json:
+            try:
+                items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+                for item in items:
+                    desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+                    cats_in_session.add(_categorize_friction(desc.lower()))
+            except Exception:
+                pass
+
+        if not cats_in_session:
+            cats_in_session = {"Other"}
+
+        per_cat_hours = session_waste_hours / len(cats_in_session)
+        per_cat_cost = (cost_usd or 0) / len(cats_in_session)
+        for c in cats_in_session:
+            cat_data[c]["waste_hours"] += per_cat_hours
+            cat_data[c]["sessions"] += 1
+            cat_data[c]["cost_usd"] += per_cat_cost
+
+        total_waste_hours += session_waste_hours
+        total_cost_usd += cost_usd or 0
+
+    by_category = sorted(
+        [
+            {
+                "category": cat,
+                "waste_hours": round(data["waste_hours"], 2),
+                "sessions": data["sessions"],
+                "cost_usd": round(data["cost_usd"], 2),
+            }
+            for cat, data in cat_data.items()
+        ],
+        key=lambda x: -x["waste_hours"],
+    )
+
+    return jsonify({
+        "total_waste_hours": round(total_waste_hours, 2),
+        "total_cost_usd": round(total_cost_usd, 2),
+        "by_category": by_category,
+    })
+
+
+@app.route("/api/streaks")
+def api_streaks():
+    """Calculate clean session streaks by friction category."""
+    conn = get_conn()
+
+    rows = conn.execute("""
+        SELECT j.session_id, j.misalignments, s.started_at
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+          AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
+        ORDER BY s.started_at
+    """).fetchall()
+
+    if not rows:
+        return jsonify({"streaks": []})
+
+    # Build timeline: for each session, which friction categories appeared
+    session_cats = []
+    for sid, mis_json, started_at in rows:
+        cats = set()
+        if mis_json:
+            try:
+                items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+                for item in items:
+                    desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+                    cats.add(_categorize_friction(desc.lower()))
+            except Exception:
+                pass
+        session_cats.append((str(started_at)[:10] if started_at else "", cats))
+
+    # For each friction category: compute current streak, best streak, last occurrence
+    all_cats = set()
+    for _, cats in session_cats:
+        all_cats.update(cats)
+
+    from datetime import date as _date
+    streaks = []
+    for cat in sorted(all_cats):
+        if cat == "Other":
+            continue
+
+        # Current streak: consecutive sessions from the end WITHOUT this category
+        current_streak = 0
+        for day_str, cats in reversed(session_cats):
+            if cat in cats:
+                break
+            current_streak += 1
+
+        # Best streak: longest consecutive run without this category
+        best_streak = 0
+        run = 0
+        last_occurrence_date = ""
+        for day_str, cats in session_cats:
+            if cat in cats:
+                best_streak = max(best_streak, run)
+                run = 0
+                last_occurrence_date = day_str
+            else:
+                run += 1
+        best_streak = max(best_streak, run)
+
+        # Days since last occurrence
+        days_since = None
+        if last_occurrence_date:
+            try:
+                from datetime import datetime
+                last_dt = datetime.strptime(last_occurrence_date, "%Y-%m-%d").date()
+                today_dt = _date.today()
+                days_since = (today_dt - last_dt).days
+            except Exception:
+                pass
+
+        streaks.append({
+            "pattern": cat,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
+            "last_occurrence": last_occurrence_date,
+            "days_since": days_since,
+        })
+
+    streaks.sort(key=lambda x: -x["current_streak"])
+    return jsonify({"streaks": streaks})
+
+
+@app.route("/api/friction-pattern-map")
+def api_friction_pattern_map():
+    """Cross-project friction matrix."""
+    conn = get_conn()
+
+    rows = conn.execute("""
+        SELECT j.misalignments, s.project_name
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.misalignments IS NOT NULL AND j.misalignments != '[]'
+          AND s.turn_count >= 1
+          AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
+    """).fetchall()
+
+    from collections import defaultdict
+    matrix = defaultdict(lambda: defaultdict(int))
+    projects_set = set()
+    patterns_set = set()
+
+    for mis_json, project in rows:
+        short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        try:
+            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            for item in items:
+                desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+                cat = _categorize_friction(desc.lower())
+                matrix[short_project][cat] += 1
+                projects_set.add(short_project)
+                patterns_set.add(cat)
+        except Exception:
+            pass
+
+    # Sort projects by total friction count
+    projects = sorted(projects_set, key=lambda p: -sum(matrix[p].values()))[:10]
+    patterns = sorted(patterns_set, key=lambda pa: -sum(matrix[p].get(pa, 0) for p in projects))
+
+    matrix_out = {p: dict(matrix[p]) for p in projects}
+    return jsonify({
+        "projects": projects,
+        "patterns": patterns,
+        "matrix": matrix_out,
+    })
+
+
+@app.route("/api/claudemd-effectiveness")
+def api_claudemd_effectiveness():
+    """Track effectiveness of CLAUDE.md rules over time."""
+    conn = get_conn()
+
+    # Get current rules from synthesis
+    synth_row = conn.execute(
+        "SELECT claude_md_additions FROM synthesis WHERE id = 1"
+    ).fetchone()
+    if not synth_row or not synth_row[0]:
+        return jsonify({"effectiveness": []})
+
+    try:
+        additions = json.loads(synth_row[0]) if isinstance(synth_row[0], str) else (synth_row[0] or [])
+    except (json.JSONDecodeError, ValueError):
+        return jsonify({"effectiveness": []})
+
+    # Get synthesis history ordered by time
+    history_rows = conn.execute("""
+        SELECT claude_md_additions, generated_at FROM synthesis_history
+        ORDER BY generated_at ASC
+    """).fetchall()
+
+    # Get all sessions ordered by time with misalignment data
+    session_rows = conn.execute("""
+        SELECT s.started_at, j.misalignment_count, j.misalignments
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+          AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'
+        ORDER BY s.started_at
+    """).fetchall()
+
+    results = []
+    for addition in additions:
+        rule = addition.get("rule", "").strip()
+        if not rule:
+            continue
+
+        # Find first time this rule appeared in history
+        first_seen = None
+        for hist_json, gen_at in history_rows:
+            if hist_json and rule[:40].lower() in (hist_json or "").lower():
+                first_seen = gen_at
+                break
+
+        # Count sessions before/after with any friction
+        before_total = before_friction = after_total = after_friction = 0
+        for started_at, mis_count, _ in session_rows:
+            if first_seen and str(started_at) < str(first_seen):
+                before_total += 1
+                if mis_count and mis_count > 0:
+                    before_friction += 1
+            else:
+                after_total += 1
+                if mis_count and mis_count > 0:
+                    after_friction += 1
+
+        before_rate = before_friction / before_total if before_total > 0 else None
+        after_rate = after_friction / after_total if after_total > 0 else None
+
+        if before_rate is not None and after_rate is not None:
+            delta = after_rate - before_rate
+            if delta < -0.1:
+                status = "working"
+            elif delta > 0.05:
+                status = "violated"
+            else:
+                status = "unclear"
+        elif first_seen is None:
+            status = "new"
+        else:
+            status = "insufficient_data"
+
+        results.append({
+            "rule": rule,
+            "first_seen": first_seen,
+            "before_sessions": before_total,
+            "after_sessions": after_total,
+            "before_friction_rate": round(before_rate, 2) if before_rate is not None else None,
+            "after_friction_rate": round(after_rate, 2) if after_rate is not None else None,
+            "delta": round(delta, 2) if (before_rate is not None and after_rate is not None) else None,
+            "status": status,
+        })
+
+    return jsonify({"effectiveness": results})
+
+
+@app.route("/api/sessions/<session_id>/rewrite-prompt", methods=["POST"])
+def api_rewrite_prompt(session_id):
+    """Generate a rewritten version of the session's opening prompt."""
+    from .llm_judge import rewrite_prompt
+    conn = get_conn()
+    result = rewrite_prompt(session_id, conn)
+    return jsonify(result)
+
+
+@app.route("/api/sessions/<session_id>/handoff")
+def api_session_handoff(session_id):
+    """Generate a handoff memo for a session."""
+    from .llm_judge import generate_handoff
+    conn = get_conn()
+    result = generate_handoff(session_id, conn)
+    return jsonify(result)
+
+
+@app.route("/api/predict-friction", methods=["POST"])
+def api_predict_friction():
+    """Predict friction risk for a new prompt."""
+    from .llm_judge import predict_friction
+    body = request.get_json(silent=True) or {}
+    prompt_text = body.get("prompt", "").strip()
+    if not prompt_text:
+        return jsonify({"error": "prompt is required"}), 400
+    conn = get_conn()
+    result = predict_friction(prompt_text, conn)
+    return jsonify(result)
+
+
+@app.route("/api/claudemd-audit", methods=["POST"])
+def api_claudemd_audit():
+    """Audit CLAUDE.md rules against recent session data."""
+    from .llm_judge import audit_claudemd
+    conn = get_conn()
+    result = audit_claudemd(conn)
+    return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# Live agent monitor (process-monitor view)
+# ---------------------------------------------------------------------------
+
+_PROCESS_MONITOR_JS = (
+    Path.home() / "code" / "agenttrace" / "views" / "process-monitor" / "dist" / "index.js"
+)
+
+
+@app.route("/viewer")
+def viewer():
+    return send_from_directory(_static, "viewer.html")
+
+
+@app.route("/viewer/process-monitor.js")
+def viewer_process_monitor_js():
+    content = _PROCESS_MONITOR_JS.read_text()
+    return Response(content, mimetype="application/javascript")
+
+
+@app.route("/api/session/<session_id>/dag")
+def api_session_dag(session_id):
+    """Return the execution DAG for a session.
+
+    Each turn = one assistant message (is_sidechain=0).
+    For turns containing a Task call, include the sub-agent's tool sequence
+    from progress_entries (parent_tool_id = the assistant entry_id).
+    """
+    import json as _json
+    conn = get_conn()
+
+    # Ensure indexes exist (created once, fast no-op thereafter)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_progress_parent
+        ON progress_entries(parent_tool_id, progress_type)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_raw_parent_uuid
+        ON raw_entries(parent_uuid, is_tool_result)
+    """)
+
+    # Main-thread turns (not sidechain), most recent 150 turns
+    turns_rows = conn.execute("""
+        SELECT r.entry_id, r.timestamp_utc, r.tool_names, r.tool_input_preview,
+               r.duration_ms,
+               CASE WHEN tr.entry_id IS NOT NULL THEN 1 ELSE 0 END AS completed,
+               COALESCE(tr.tool_result_error, 0) AS error
+        FROM (
+            SELECT entry_id, timestamp_utc, tool_names, tool_input_preview, duration_ms
+            FROM raw_entries
+            WHERE session_id = ?
+              AND entry_type = 'assistant'
+              AND is_sidechain = 0
+              AND tool_names IS NOT NULL
+              AND tool_names != '[]'
+            ORDER BY timestamp_utc DESC
+            LIMIT 150
+        ) r
+        LEFT JOIN raw_entries tr
+               ON tr.parent_uuid = r.entry_id AND tr.is_tool_result = 1
+        ORDER BY r.timestamp_utc
+    """, [session_id]).fetchall()
+
+    # Fetch ALL agent_progress entries for this session in one query, then
+    # trace chains in Python (avoids N slow recursive CTEs).
+    # Chain structure: first entry has parent_tool_id = raw Task entry_id;
+    # subsequent entries chain: parent_tool_id = previous progress entry_id.
+    all_prog = conn.execute("""
+        SELECT entry_id, parent_tool_id, tool_name, has_result, result_error, timestamp_utc
+        FROM progress_entries
+        WHERE session_id = ? AND progress_type = 'agent_progress'
+        ORDER BY timestamp_utc
+    """, [session_id]).fetchall()
+
+    # Build lookup: entry_id → row
+    prog_by_id: dict = {r[0]: r for r in all_prog}
+    # Build lookup: parent_tool_id → [children]
+    prog_children: dict = {}
+    for r in all_prog:
+        prog_children.setdefault(r[1], []).append(r)
+
+    def collect_chain(root_id: str) -> list:
+        """Walk the chain rooted at root_id, collecting tool_name entries."""
+        result = []
+        stack = list(prog_children.get(root_id, []))
+        visited = set()
+        while stack:
+            row = stack.pop(0)
+            eid = row[0]
+            if eid in visited:
+                continue
+            visited.add(eid)
+            if row[2]:  # tool_name is not None
+                result.append({"tool": row[2], "completed": bool(row[3]),
+                                "error": bool(row[4]), "timestamp": row[5]})
+            stack.extend(prog_children.get(eid, []))
+        result.sort(key=lambda x: x["timestamp"])
+        return result
+
+    # Build turns
+    turns = []
+    for entry_id, ts, tool_names_json, preview, duration_ms, completed, error in turns_rows:
+        try:
+            names = _json.loads(tool_names_json) if tool_names_json else []
+        except Exception:
+            names = []
+
+        subagent_calls = None
+        if "Task" in names:
+            subagent_calls = collect_chain(entry_id)
+
+        turns.append({
+            "entryId":      entry_id,
+            "timestamp":    ts,
+            "tools":        names,
+            "preview":      (preview or "").strip()[:120],
+            "durationMs":   duration_ms,
+            "completed":    bool(completed),
+            "error":        bool(error),
+            "subagentCalls": subagent_calls,  # None if no Task in this turn
+        })
+
+    return jsonify({"sessionId": session_id, "turns": turns})
+
+
+@app.route("/api/session/<session_id>/subagents")
+def api_session_subagents(session_id):
+    """Return Task/subagent calls within a session, with completion status."""
+    import json as _json
+    conn = get_conn()
+
+    rows = conn.execute("""
+        SELECT
+            r.entry_id,
+            r.timestamp_utc                                  AS started_at,
+            r.tool_input_preview,
+            r.tool_names,
+            CASE WHEN tr.entry_id IS NOT NULL THEN 1 ELSE 0 END AS completed,
+            COALESCE(tr.tool_result_error, 0)                AS error,
+            tr.timestamp_utc                                 AS finished_at,
+            SUBSTR(COALESCE(tr.user_text, ''), 1, 300)      AS output
+        FROM raw_entries r
+        LEFT JOIN raw_entries tr
+               ON tr.parent_uuid = r.entry_id
+              AND tr.is_tool_result = 1
+        WHERE r.session_id = ?
+          AND r.entry_type = 'assistant'
+          AND (
+                r.tool_names LIKE '%Task%'
+             OR r.tool_names LIKE '%Bash%'
+             OR r.tool_names LIKE '%WebSearch%'
+             OR r.tool_names LIKE '%WebFetch%'
+             OR r.tool_names LIKE '%Read%'
+             OR r.tool_names LIKE '%Grep%'
+             OR r.tool_names LIKE '%Glob%'
+             OR r.tool_names LIKE '%Edit%'
+             OR r.tool_names LIKE '%Write%'
+          )
+        ORDER BY r.timestamp_utc
+    """, [session_id]).fetchall()
+
+    agents = []
+    for entry_id, started_at, preview, tool_names_json, completed, error, finished_at, output in rows:
+        try:
+            names = _json.loads(tool_names_json) if tool_names_json else []
+        except Exception:
+            names = []
+        tool = names[0] if names else "?"
+
+        # duration
+        duration_ms = None
+        if started_at and finished_at:
+            try:
+                from datetime import datetime as _dt
+                s = _dt.fromisoformat(started_at.replace("Z", "+00:00"))
+                f = _dt.fromisoformat(finished_at.replace("Z", "+00:00"))
+                duration_ms = int((f - s).total_seconds() * 1000)
+            except Exception:
+                pass
+
+        agents.append({
+            "id":          entry_id,
+            "tool":        tool,
+            "prompt":      (preview or "").strip()[:120],
+            "output":      (output or "").strip()[:300],
+            "completed":   bool(completed),
+            "error":       bool(error),
+            "startedAt":   started_at,
+            "finishedAt":  finished_at,
+            "durationMs":  duration_ms,
+        })
+
+    return jsonify({"sessionId": session_id, "agents": agents})
+
+
+@app.route("/api/live")
+def api_live():
+    import json as _json
+
+    conn = get_conn()
+
+    _PRICING = {
+        "claude-opus-4-6":              (15.0,  75.0),
+        "claude-sonnet-4-6":            ( 3.0,  15.0),
+        "claude-sonnet-4-5":            ( 3.0,  15.0),
+        "claude-haiku-4-5-20251001":    ( 0.8,   4.0),
+        "claude-haiku-4-5":             ( 0.8,   4.0),
+        "claude-3-5-sonnet-20241022":   ( 3.0,  15.0),
+        "claude-3-7-sonnet-20250219":   ( 3.0,  15.0),
+        "claude-3-5-haiku-20241022":    ( 0.8,   4.0),
+        "claude-3-opus-20240229":       (15.0,  75.0),
+    }
+
+    def cost_usd(model, inp, out):
+        ip, op = _PRICING.get(model, (3.0, 15.0))
+        return (inp * ip + out * op) / 1_000_000
+
+    # Main query: all sessions active in last 10 min, with rich state
+    rows = conn.execute("""
+        WITH recent_sessions AS (
+            -- Only sessions with activity in the last 3 minutes.
+            -- A session is "active" only if something actually happened recently;
+            -- finished sessions drop off after 3 min rather than lingering as false
+            -- "waiting" entries. The is_running check separately uses a 15-min
+            -- cutoff to handle slow Bash/Task calls.
+            SELECT DISTINCT session_id
+            FROM raw_entries
+            WHERE julianday(timestamp_utc) > julianday('now', '-8 hours')
+              AND session_id IS NOT NULL
+        ),
+        session_stats AS (
+            SELECT
+                session_id,
+                COUNT(*) FILTER (WHERE entry_type = 'assistant')           AS turn_count,
+                SUM(input_tokens)                                           AS total_in,
+                SUM(output_tokens)                                          AS total_out,
+                SUM(tool_result_error)                                      AS error_count,
+                MAX(model) FILTER (WHERE model LIKE 'claude-%')             AS model,
+                -- peak context in last 5 min; cast guards against corrupt rows
+                MAX(CAST(input_tokens AS INTEGER)) FILTER (
+                    WHERE entry_type = 'assistant'
+                      AND julianday(timestamp_utc) > julianday('now', '-300 seconds')
+                      AND typeof(input_tokens) IN ('integer', 'real')
+                )                                                           AS recent_ctx
+            FROM raw_entries
+            WHERE session_id IN (SELECT session_id FROM recent_sessions)
+            GROUP BY session_id
+        ),
+        -- Most recent assistant entry that had tool calls (only within 15 min —
+        -- older unmatched calls are stale ingestion artifacts, not live activity)
+        latest_tool_asst AS (
+            SELECT e.session_id, e.entry_id,
+                   e.tool_names, e.timestamp_utc AS tool_ts,
+                   e.tool_file_paths, e.tool_input_preview
+            FROM raw_entries e
+            WHERE e.session_id IN (SELECT session_id FROM recent_sessions)
+              AND e.entry_type = 'assistant'
+              AND e.tool_names IS NOT NULL
+              AND e.tool_names != '[]'
+              AND e.tool_names != ''
+              AND julianday(e.timestamp_utc) > julianday('now', '-900 seconds')
+              AND e.timestamp_utc = (
+                  SELECT MAX(r2.timestamp_utc) FROM raw_entries r2
+                  WHERE r2.session_id = e.session_id
+                    AND r2.entry_type = 'assistant'
+                    AND r2.tool_names IS NOT NULL
+                    AND r2.tool_names != '[]'
+                    AND r2.tool_names != ''
+                    AND julianday(r2.timestamp_utc) > julianday('now', '-900 seconds')
+              )
+        ),
+        -- Last assistant text snippet (what the agent was explaining/thinking)
+        last_text AS (
+            SELECT e.session_id,
+                   e.text_content AS snippet
+            FROM raw_entries e
+            WHERE e.session_id IN (SELECT session_id FROM recent_sessions)
+              AND e.entry_type = 'assistant'
+              AND e.text_length > 0
+              AND e.timestamp_utc = (
+                  SELECT MAX(r2.timestamp_utc) FROM raw_entries r2
+                  WHERE r2.session_id = e.session_id
+                    AND r2.entry_type = 'assistant'
+                    AND r2.text_length > 0
+              )
+        )
+        SELECT
+            rs.session_id,
+            lta.tool_names,
+            lta.tool_ts                                                     AS tool_started_at,
+            -- running = latest tool call (within 15 min) has no result yet
+            CASE WHEN lta.entry_id IS NOT NULL
+                      AND tr.entry_id IS NULL THEN 1 ELSE 0 END             AS is_running,
+            COALESCE(s.project_name,
+                (SELECT project_name FROM raw_entries
+                 WHERE session_id = rs.session_id
+                   AND project_name IS NOT NULL LIMIT 1))                   AS project_name,
+            COALESCE(s.started_at,
+                (SELECT MIN(timestamp_utc) FROM raw_entries
+                 WHERE session_id = rs.session_id))                         AS started_at,
+            (SELECT MAX(timestamp_utc) FROM raw_entries
+             WHERE session_id = rs.session_id)                              AS last_active,
+            COALESCE(s.first_prompt, '')                                    AS first_prompt,
+            COALESCE(ss.turn_count,   0)                                    AS turn_count,
+            COALESCE(ss.total_in,     0)                                    AS total_in,
+            COALESCE(ss.total_out,    0)                                    AS total_out,
+            COALESCE(ss.error_count,  0)                                    AS error_count,
+            ss.model,
+            COALESCE(ss.recent_ctx,   0)                                    AS recent_ctx,
+            (SELECT cwd FROM raw_entries
+             WHERE session_id = rs.session_id
+               AND cwd IS NOT NULL
+             ORDER BY timestamp_utc DESC LIMIT 1)                           AS cwd,
+            lta.tool_file_paths                                             AS tool_file_paths,
+            COALESCE(lta.tool_input_preview, '')                           AS tool_input_preview,
+            SUBSTR(COALESCE(lt.snippet, ''), 1, 120)                       AS last_snippet
+        FROM recent_sessions rs
+        LEFT JOIN latest_tool_asst lta    ON lta.session_id = rs.session_id
+        LEFT JOIN raw_entries tr          ON tr.parent_uuid = lta.entry_id
+                                         AND tr.is_tool_result = 1
+        LEFT JOIN sessions s              ON s.session_id   = rs.session_id
+        LEFT JOIN session_stats ss        ON ss.session_id  = rs.session_id
+        LEFT JOIN last_text lt            ON lt.session_id  = rs.session_id
+        ORDER BY last_active DESC
+    """).fetchall()
+
+    # Separate query: current error streak per session
+    # (count of consecutive errors from the most recent tool result backward)
+    streak_rows = conn.execute("""
+        WITH recent_sessions AS (
+            SELECT DISTINCT session_id FROM raw_entries
+            WHERE julianday(timestamp_utc) > julianday('now', '-8 hours')
+              AND session_id IS NOT NULL
+        ),
+        ranked AS (
+            SELECT session_id, tool_result_error,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY session_id ORDER BY timestamp_utc DESC
+                   ) AS rn
+            FROM raw_entries
+            WHERE session_id IN (SELECT session_id FROM recent_sessions)
+              AND is_tool_result = 1
+        ),
+        first_success AS (
+            SELECT session_id, MIN(rn) AS success_rn
+            FROM ranked WHERE tool_result_error = 0
+            GROUP BY session_id
+        )
+        SELECT r.session_id, COUNT(*) AS streak
+        FROM ranked r
+        LEFT JOIN first_success fs ON fs.session_id = r.session_id
+        WHERE r.tool_result_error = 1
+          AND r.rn < COALESCE(fs.success_rn, 99999)
+        GROUP BY r.session_id
+    """).fetchall()
+    streaks = {r[0]: r[1] for r in streak_rows}
+
+    agents = []
+    for r in rows:
+        (session_id, tool_names_json, tool_started_at, is_running,
+         project_name, started_at, last_active,
+         first_prompt, turn_count, total_in, total_out, error_count, model,
+         recent_ctx, cwd, tool_file_paths_json, tool_input_preview, last_snippet) = r
+
+        try:
+            names = _json.loads(tool_names_json) if tool_names_json else []
+        except Exception:
+            names = []
+
+        try:
+            file_paths = _json.loads(tool_file_paths_json) if tool_file_paths_json else []
+        except Exception:
+            file_paths = []
+
+        current_tool = names[0] if names else None
+
+        # Build "what it's doing" context string:
+        # 1. Prefer tool_input_preview (actual command/query/prompt from ingest)
+        # 2. Fall back to file basename for file ops
+        # 3. Fall back to last assistant text snippet
+        context = ""
+        if tool_input_preview:
+            context = tool_input_preview[:120]
+        elif current_tool and file_paths:
+            import os as _os
+            context = _os.path.basename(file_paths[0])
+        elif last_snippet:
+            context = last_snippet.strip().split("\n")[0].strip()[:80]
+
+        status = "active" if is_running else "idle"
+
+        if first_prompt and first_prompt.strip():
+            label = first_prompt.strip().split("\n")[0].strip()[:72]
+        else:
+            label = project_name or session_id[:8] or "unknown"
+
+        try:
+            ctx_pct = round(int(recent_ctx or 0) / 200_000 * 100, 1) if recent_ctx else 0
+        except (ValueError, TypeError):
+            ctx_pct = 0
+
+        agents.append({
+            "id":             session_id,
+            "name":           label,
+            "status":         status,
+            "currentTool":    current_tool if is_running else None,
+            "toolStartedAt":  tool_started_at if is_running else None,
+            "sessionId":      session_id,
+            "projectName":    project_name or "",
+            "startedAt":      started_at or last_active,
+            "lastActivityAt": last_active,
+            "parentId":       None,
+            "isSubagent":     False,
+            "turnCount":      int(turn_count  or 0),
+            "costUsd":        round(cost_usd(model or "", int(total_in or 0), int(total_out or 0)), 4),
+            "errorCount":     int(error_count or 0),
+            "errorStreak":    streaks.get(session_id, 0),
+            "ctxPct":         ctx_pct,
+            "model":          model or "",
+            "cwd":            cwd or "",
+            "context":        context,
+        })
+
+    return jsonify({"agents": agents})

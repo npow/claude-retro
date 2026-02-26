@@ -424,6 +424,8 @@ a:hover { text-decoration: underline; }
 .tool-bar-track { flex: 1; height: 6px; background: var(--inset); border-radius: 3px; overflow: hidden; }
 .tool-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
 .tool-bar-count { width: 28px; font-size: 10px; color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; }
+.tool-bar-err { width: 28px; font-size: 10px; color: var(--red); text-align: right; font-variant-numeric: tabular-nums; }
+.tool-bar-dur { width: 52px; font-size: 10px; color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Collapsible timeline — uses msg-entry style */
 .timeline-toggle {
@@ -1102,6 +1104,10 @@ tr:hover td { background: var(--surface2); }
   <!-- Top bar — agentsview AppHeader pattern -->
   <div class="top-bar">
     <h1>Claude <span>Retro</span></h1>
+    <div id="refresh-progress" style="display:none;flex:1;justify-content:center;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)">
+      <span id="refresh-step"></span>
+      <span id="refresh-count" style="color:var(--accent);font-weight:500"></span>
+    </div>
     <div style="display:flex;align-items:center;gap:2px;margin-left:auto">
       <button id="theme-toggle" onclick="toggleTheme()" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--text-dim);font-size:14px;transition:background 0.12s,color 0.12s;line-height:1" title="Toggle theme"></button>
       <select id="concurrency-select" style="height:26px;padding:0 8px;background:var(--inset);border:1px solid var(--border-muted);border-radius:4px;color:var(--text-sec);font-size:11px;outline:none;cursor:pointer;transition:border-color 0.15s" title="Parallelism">
@@ -1112,17 +1118,10 @@ tr:hover td { background: var(--surface2); }
         <option value="24">24x</option>
       </select>
       <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">Run Judge</button>
+      <button class="refresh-btn" id="fill-narratives-btn" onclick="fillNarratives()" style="display:none;background:color-mix(in srgb, var(--accent2) 15%, var(--surface2));color:var(--accent2);border-color:color-mix(in srgb, var(--accent2) 30%, transparent)" title="Re-judge sessions that are missing story narratives">Fill Stories</button>
       <a href="/api/export" download style="height:24px;padding:0 8px;border-radius:4px;font-size:11px;font-weight:500;color:var(--text-dim);text-decoration:none;display:inline-flex;align-items:center;transition:background 0.1s,color 0.1s" onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text-sec)'" onmouseout="this.style.background='';this.style.color='var(--text-dim)'">Export</a>
     </div>
     <div id="refresh-bar" style="position:absolute;bottom:-1px;left:0;height:2px;width:0%;background:var(--accent);transition:width 0.3s"></div>
-  </div>
-
-  <!-- Progress -->
-  <div id="refresh-progress" style="display:none;position:fixed;top:8px;right:16px;background:var(--surface);border:1px solid var(--border-muted);border-radius:var(--radius);padding:6px 10px;font-size:11px;color:var(--text-dim);z-index:1000;box-shadow:var(--shadow-md);transition:background-color 0.3s,border-color 0.3s">
-    <div style="display:flex;gap:8px;align-items:center">
-      <span id="refresh-step"></span>
-      <span id="refresh-count" style="color:var(--accent);font-weight:500"></span>
-    </div>
   </div>
 
   <!-- 1. THE VERDICT -->
@@ -1137,6 +1136,15 @@ tr:hover td { background: var(--surface2); }
     <a href="#friction-section" onclick="scrollToSection(event,'friction-section')">Friction</a>
     <a href="#highlights-section" onclick="scrollToSection(event,'highlights-section')">Highlights</a>
   </nav>
+
+  <!-- WHAT CHANGED SINCE LAST RUN — delta banner -->
+  <div id="delta-banner" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:6px;background:color-mix(in srgb, var(--accent2) 8%, var(--card));border:1px solid color-mix(in srgb, var(--accent2) 25%, transparent);font-size:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-weight:600;color:var(--accent2);font-size:11px;letter-spacing:.05em;text-transform:uppercase">Since Last Run</span>
+      <span id="delta-date" style="color:var(--text-dim);font-size:10px"></span>
+    </div>
+    <div id="delta-items" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+  </div>
 
   <!-- AT A GLANCE (from synthesis) — collapsible -->
   <div class="narrative-section at-a-glance" id="at-a-glance" style="display:none">
@@ -1225,6 +1233,35 @@ tr:hover td { background: var(--surface2); }
     <!-- Skill nudges -->
     <div id="skill-nudges-section" style="display:none"></div>
 
+    <!-- Pre-Session Advisor -->
+    <div id="advisor-section">
+      <div class="section-label" style="color:var(--accent)">Pre-Session Advisor</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">Paste your opening prompt to predict friction before you start.</div>
+      <textarea id="advisor-input" placeholder="Paste your opening prompt here to predict friction..." style="width:100%;box-sizing:border-box;background:var(--card-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:12px;font-family:inherit;resize:vertical;min-height:80px;margin-bottom:6px"></textarea>
+      <button onclick="analyzePrompt()" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600">🔮 Analyze Friction Risk</button>
+      <div id="advisor-result" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Lost Hours + Streaks -->
+    <div id="lost-hours-section" style="margin-top:16px;display:none">
+      <div id="lost-hours-content"></div>
+    </div>
+
+    <!-- Groundhog Day Detector -->
+    <div id="groundhog-section" style="margin-top:16px;display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="section-label" style="color:#f97316;margin-bottom:0">STUCK IN A LOOP</div>
+        <span id="groundhog-badge" style="background:#f97316;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700"></span>
+      </div>
+      <div id="groundhog-content"></div>
+    </div>
+
+    <!-- Friction Pattern Map -->
+    <div id="friction-map-section" style="margin-top:16px;display:none">
+      <div class="section-label" style="color:var(--red);margin-bottom:8px">Cross-Project Friction Map</div>
+      <div id="friction-map-content"></div>
+    </div>
+
     <!-- Change These 3 Things -->
     <div id="changes-section" style="display:none">
       <div class="section-label">Change These 3 Things</div>
@@ -1235,7 +1272,11 @@ tr:hover td { background: var(--surface2); }
     <div id="claude-md-section" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div class="section-label" style="color:var(--blue);margin-bottom:0">CLAUDE.md Suggestions</div>
-        <span id="claude-md-status" style="font-size:10px;color:var(--green);font-weight:500"></span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="claude-md-status" style="font-size:10px;color:var(--green);font-weight:500"></span>
+          <button id="audit-rules-btn" class="copy-btn" onclick="auditRules()" style="background:var(--card-bg)">🔍 Audit Rules</button>
+          <button id="copy-all-rules" class="copy-btn" onclick="copyAllRules()">Copy All</button>
+        </div>
       </div>
       <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">Written to your project CLAUDE.md files after each judge run.</div>
       <div id="claude-md-container"></div>
@@ -1269,6 +1310,8 @@ tr:hover td { background: var(--surface2); }
   <!-- TAB: Charts -->
   <div class="tab-content" id="tab-charts">
     <div id="bar-charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"></div>
+    <div id="bar-charts-grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"></div>
+    <div id="multi-clauding-section" style="margin-bottom:12px"></div>
     <div id="activity-section">
       <div style="display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; margin-bottom:12px">
         <div class="chart-card">
@@ -1298,6 +1341,30 @@ tr:hover td { background: var(--surface2); }
   <div class="session-modal">
     <button class="session-modal-close" onclick="closeSessionModal()">&times;</button>
     <div id="session-modal-content"><div class="loading"><span class="spinner"></span></div></div>
+  </div>
+</div>
+
+<!-- PROMPT REWRITER MODAL -->
+<div class="session-modal-backdrop" id="rewrite-modal" onclick="if(event.target===this)closeRewriteModal()" style="display:none">
+  <div class="session-modal" style="max-width:720px">
+    <button class="session-modal-close" onclick="closeRewriteModal()">&times;</button>
+    <div id="rewrite-modal-content"></div>
+  </div>
+</div>
+
+<!-- HANDOFF MEMO MODAL -->
+<div class="session-modal-backdrop" id="handoff-modal" onclick="if(event.target===this)closeHandoffModal()" style="display:none">
+  <div class="session-modal" style="max-width:620px">
+    <button class="session-modal-close" onclick="closeHandoffModal()">&times;</button>
+    <div id="handoff-modal-content"></div>
+  </div>
+</div>
+
+<!-- FRICTION DRILL-THROUGH MODAL -->
+<div class="session-modal-backdrop" id="friction-modal" onclick="if(event.target===this)closeFrictionModal()" style="display:none">
+  <div class="session-modal" style="max-width:680px">
+    <button class="session-modal-close" onclick="closeFrictionModal()">&times;</button>
+    <div id="friction-modal-content"></div>
   </div>
 </div>
 
@@ -1461,6 +1528,17 @@ async function loadVerdict() {
   const el = document.getElementById('verdict');
 
   const unjudged = overview.total_sessions - jStats.total_judged;
+
+  // Show "Fill Stories" button if sessions are missing narratives
+  try {
+    const fillCheck = await api('/api/fill-narratives', { method: 'HEAD' }).catch(() => null);
+    // Just check DB directly via judgments stats
+    const missingNarratives = jStats.total_judged > 0 ? Math.max(0, jStats.total_judged - (jStats.narrative_count || 0)) : 0;
+    if (missingNarratives > 5) {
+      const fnBtn = document.getElementById('fill-narratives-btn');
+      if (fnBtn) { fnBtn.style.display = ''; fnBtn.title = `${missingNarratives} sessions need stories`; }
+    }
+  } catch (_) {}
 
   // Stat cards builder
   function statCard(value, label, sub) {
@@ -1768,8 +1846,8 @@ async function loadSynthesis() {
     if (friction && friction.length > 0) {
       document.getElementById('friction-container').innerHTML = friction.map(f => {
         const examples = (f.examples || []).map(e => e).join('; ');
-        return `<div class="friction-card">
-          <h3>${f.title}</h3>
+        return `<div class="friction-card" style="cursor:pointer" data-friction-title="${esc(f.title)}" onclick="openFrictionDrillthrough(this.dataset.frictionTitle)" title="Click to see sessions with this friction">
+          <h3>${f.title} <span style="font-size:10px;font-weight:400;color:var(--text-dim);margin-left:4px">→ see sessions</span></h3>
           <p>${f.description}</p>
           ${examples ? `<div class="examples">${examples}</div>` : ''}
           ${f.user_quote ? `<blockquote class="friction-quote">"${esc(f.user_quote)}"</blockquote>` : ''}
@@ -1787,8 +1865,9 @@ async function loadSynthesis() {
     if (additions && additions.length > 0) {
       document.getElementById('claude-md-container').innerHTML = additions.map((a, i) =>
         `<div class="claude-md-card">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
             <span style="color:var(--green);font-size:11px;font-weight:600">AUTO-APPLIED</span>
+            <button class="copy-btn" onclick="copyRule(this, ${i})">Copy</button>
           </div>
           <div class="rule-text" id="rule-text-${i}">${a.rule || ''}</div>
           <div class="rationale">${a.rationale || ''}</div>
@@ -1814,9 +1893,122 @@ async function loadSynthesis() {
 
     // Show section nav when we have synthesis content
     showSectionNav();
+
+    // Load delta after synthesis
+    loadDelta();
   } catch (e) {
     console.error('Failed to load synthesis:', e);
   }
+}
+
+async function loadDelta() {
+  try {
+    const data = await api('/api/synthesis/delta');
+    const d = data.delta;
+    if (!d) return;
+
+    const banner = document.getElementById('delta-banner');
+    const items = document.getElementById('delta-items');
+    const dateEl = document.getElementById('delta-date');
+
+    const parts = [];
+
+    // Sessions delta
+    if (d.sessions_delta !== 0) {
+      const sign = d.sessions_delta > 0 ? '+' : '';
+      parts.push({ label: `${sign}${d.sessions_delta} sessions`, color: d.sessions_delta > 0 ? 'var(--green)' : 'var(--text-dim)' });
+    }
+
+    // Productivity delta
+    if (Math.abs(d.productivity_delta) > 0.001) {
+      const pct = (d.productivity_delta * 100).toFixed(1);
+      const sign = d.productivity_delta > 0 ? '+' : '';
+      parts.push({ label: `productivity ${sign}${pct}pp`, color: d.productivity_delta > 0 ? 'var(--green)' : 'var(--red)' });
+    }
+
+    // Skill changes
+    const skillNames = {
+      'context_management': 'Context Mgmt', 'planning_decomposition': 'Planning',
+      'prompt_craft': 'Prompts', 'claude_md_configuration': 'Config',
+      'tool_leverage': 'Tools', 'verification_qa': 'Verification',
+      'git_workflow': 'Git', 'error_recovery': 'Error Recovery',
+      'session_strategy': 'Sessions', 'codebase_design': 'Design',
+    };
+    for (const [dim, chg] of Object.entries(d.skill_changes || {})) {
+      const dir = chg.to > chg.from ? '↑' : '↓';
+      const color = chg.to > chg.from ? 'var(--green)' : 'var(--red)';
+      parts.push({ label: `${skillNames[dim] || dim} ${dir}L${chg.from}→L${chg.to}`, color });
+    }
+
+    if (parts.length === 0) {
+      parts.push({ label: 'No significant changes', color: 'var(--text-dim)' });
+    }
+
+    items.innerHTML = parts.map(p =>
+      `<span style="color:${p.color};font-weight:500">${p.label}</span>`
+    ).join('<span style="color:var(--border)">&nbsp;·&nbsp;</span>');
+
+    if (d.previous_run) {
+      const ago = timeSince(new Date(d.previous_run));
+      dateEl.textContent = `vs run ${ago}`;
+    }
+
+    banner.style.display = 'block';
+  } catch (e) {
+    // Delta not available, silently skip
+  }
+}
+
+function timeSince(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return Math.floor(seconds/60) + 'm ago';
+  if (seconds < 86400) return Math.floor(seconds/3600) + 'h ago';
+  return Math.floor(seconds/86400) + 'd ago';
+}
+
+async function openFrictionDrillthrough(frictionType) {
+  const modal = document.getElementById('friction-modal');
+  const content = document.getElementById('friction-modal-content');
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+  content.innerHTML = `<div class="loading"><span class="spinner"></span><span style="margin-left:8px;color:var(--text-dim)">Loading sessions...</span></div>`;
+
+  try {
+    const enc = encodeURIComponent(frictionType);
+    const data = await api(`/api/sessions-by-friction?type=${enc}`);
+    const sessions = data.sessions || [];
+
+    if (sessions.length === 0) {
+      content.innerHTML = `<h3 style="color:var(--red);margin-bottom:12px">${frictionType}</h3><p style="color:var(--text-dim)">No sessions found for this friction type.</p>`;
+      return;
+    }
+
+    content.innerHTML = `
+      <h3 style="color:var(--red);margin-bottom:4px">${frictionType}</h3>
+      <p style="font-size:11px;color:var(--text-dim);margin-bottom:16px">${data.total} session${data.total !== 1 ? 's' : ''} with this friction · showing worst first</p>
+      ${sessions.map(s => `
+        <div style="margin-bottom:16px;padding:10px 12px;border:1px solid var(--border-muted);border-radius:6px;border-left:3px solid var(--red)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:600;color:var(--accent)">${s.project || 'unknown'}</span>
+            <span style="font-size:10px;color:var(--text-dim)">${s.duration_min}m · ${s.turns} turns · ${Math.round(s.productivity*100)}% productive</span>
+          </div>
+          <div style="font-size:11px;color:var(--text);margin-bottom:6px">${s.prompt_summary || ''}</div>
+          ${s.narrative ? `<div style="font-size:11px;color:var(--text-dim);line-height:1.5;margin-bottom:6px;padding:6px 8px;background:var(--card-dim);border-radius:4px">${s.narrative.slice(0, 300)}${s.narrative.length > 300 ? '…' : ''}</div>` : ''}
+          <div style="margin-top:4px">${s.matching_frictions.map(f => `<div style="font-size:10px;color:var(--red);padding:2px 0;border-top:1px solid var(--border-muted);margin-top:3px">${f}</div>`).join('')}</div>
+          <a href="#" onclick="event.preventDefault();closeFrictionModal();openSessionModal('${s.session_id}')" style="font-size:11px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:6px">View full session →</a>
+        </div>
+      `).join('')}
+    `;
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--red)">Failed to load sessions: ${e.message}</p>`;
+  }
+}
+
+function closeFrictionModal() {
+  const modal = document.getElementById('friction-modal');
+  modal.style.display = 'none';
+  modal.classList.remove('active');
 }
 
 function renderWorkflowPrompts(prompts) {
@@ -1958,16 +2150,28 @@ async function loadHighlights() {
       const color = TYPE_COLORS[h.type] || 'var(--purple)';
       const short = shortProject(h.project || '');
       const title = h.prompt_summary || '(no summary)';
-      const narrative = h.narrative ? h.narrative.split('\n')[0] : (h.what_worked || h.what_failed || '');
-      const narrativeHtml = narrative && narrative !== title ? `<div class="hl-narrative">${truncate(narrative, 200)}</div>` : '';
+      const fullNarrative = h.narrative || '';
+      const preview = fullNarrative ? fullNarrative.slice(0, 200) + (fullNarrative.length > 200 ? '…' : '') : (h.what_worked || h.what_failed || '');
+      const hasFullNarrative = fullNarrative.length > 0;
       const cost = costMap[h.session_id];
       const costHtml = cost != null ? `<span class="highlight-cost">~$${cost.toFixed(2)}</span>` : '';
-      return `<div class="highlight-card" style="border-left-color:${color}">
+      const sid = h.session_id;
+      return `<div class="highlight-card" id="hlcard-${sid}" style="border-left-color:${color}">
         <div class="hl-type" style="color:${color}">${h.label}${costHtml}</div>
         <h3>${title}</h3>
-        ${narrativeHtml}
+        ${preview ? `<div class="hl-narrative" id="hl-preview-${sid}">${preview}</div>` : ''}
+        ${hasFullNarrative ? `<div id="hl-full-${sid}" style="display:none;font-size:11px;color:var(--text-sec);line-height:1.6;margin-top:6px;padding:8px;background:var(--card-dim);border-radius:4px">${fullNarrative}
+          ${h.user_quote ? `<blockquote style="margin:8px 0 0 0;padding:6px 8px;border-left:2px solid ${color};color:var(--text-dim);font-style:italic;font-size:11px">"${esc(h.user_quote)}"</blockquote>` : ''}
+        </div>` : ''}
+        ${h.what_worked ? `<div id="hl-worked-${sid}" style="display:none;font-size:11px;color:var(--green);margin-top:4px"><strong>✓ Worked:</strong> ${h.what_worked}</div>` : ''}
+        ${h.what_failed ? `<div id="hl-failed-${sid}" style="display:none;font-size:11px;color:var(--red);margin-top:4px"><strong>✗ Failed:</strong> ${h.what_failed}</div>` : ''}
         <div class="hl-meta">${short} &middot; ${fmtDuration(h.duration)} &middot; ${h.outcome || ''}</div>
-        <span class="hl-link" onclick="toggleSessionById('${h.session_id}', '${(h.project||'').replace(/'/g,'')}')">View session &rarr;</span>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:4px">
+          ${hasFullNarrative ? `<span class="hl-link" id="hl-expand-${sid}" onclick="expandHighlight('${sid}')">Read story ↓</span>` : ''}
+          <span class="hl-link" onclick="openSessionModal('${sid}')">Full session →</span>
+          <button class="copy-btn" onclick="event.stopPropagation();showHandoff('${sid}', this)" style="font-size:10px;padding:2px 6px;position:static">📋 Handoff</button>
+          <button class="copy-btn" onclick="event.stopPropagation();showRewritePrompt('${sid}', this)" style="font-size:10px;padding:2px 6px;position:static">✏️ Rewrite</button>
+        </div>
       </div>`;
     }).join('');
     const hlSection = document.getElementById('highlights-section');
@@ -1976,6 +2180,20 @@ async function loadHighlights() {
   } catch (e) {
     console.error('Failed to load highlights:', e);
   }
+}
+
+function expandHighlight(sid) {
+  const full = document.getElementById('hl-full-' + sid);
+  const worked = document.getElementById('hl-worked-' + sid);
+  const failed = document.getElementById('hl-failed-' + sid);
+  const preview = document.getElementById('hl-preview-' + sid);
+  const btn = document.getElementById('hl-expand-' + sid);
+  const expanded = full && full.style.display !== 'none';
+  if (full) full.style.display = expanded ? 'none' : 'block';
+  if (worked) worked.style.display = expanded ? 'none' : 'block';
+  if (failed) failed.style.display = expanded ? 'none' : 'block';
+  if (preview) preview.style.display = expanded ? 'block' : 'none';
+  if (btn) btn.textContent = expanded ? 'Read story ↓' : 'Collapse ↑';
 }
 
 function toggleSessionById(sessionId, project) {
@@ -2332,16 +2550,23 @@ async function toggleSession(sessionId, cardEl) {
   // Tool usage (horizontal bar chart, CSS-based)
   if (tools.length > 0) {
     const maxUse = Math.max(...tools.map(t => t.use_count));
+    const hasTiming = tools.some(t => t.avg_duration_ms > 0);
     html += `<div class="ai-section">
       <div class="ai-label">Tools</div>
       <div class="tool-chart-wrap">
-        ${tools.slice(0, 10).map(t => `
-          <div class="tool-bar-row">
+        ${tools.slice(0, 12).map(t => {
+          const avgMs = t.avg_duration_ms || 0;
+          const durLabel = avgMs >= 60000 ? (avgMs/60000).toFixed(1)+'m'
+                         : avgMs >= 1000  ? (avgMs/1000).toFixed(1)+'s'
+                         : avgMs > 0      ? avgMs+'ms' : '';
+          return `<div class="tool-bar-row">
             <div class="tool-bar-name">${t.tool_name}</div>
             <div class="tool-bar-track"><div class="tool-bar-fill" style="width:${(t.use_count/maxUse*100).toFixed(0)}%"></div></div>
             <div class="tool-bar-count">${t.use_count}</div>
-          </div>
-        `).join('')}
+            ${t.error_count > 0 ? `<div class="tool-bar-err">${t.error_count}✕</div>` : (hasTiming ? '<div class="tool-bar-err"></div>' : '')}
+            ${hasTiming ? `<div class="tool-bar-dur">${durLabel ? `~${durLabel}` : ''}</div>` : ''}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
   }
@@ -2725,6 +2950,9 @@ function switchTab(tabName) {
       });
     }
   }
+  // Scroll tab bar into view so content is immediately visible
+  const tabBar = document.querySelector('.tab-bar');
+  if (tabBar) tabBar.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ===== SKILLS (radar + legend in verdict) =====
@@ -2964,50 +3192,67 @@ function renderSkillBadges(skills) {
   return html;
 }
 
-function renderBarChart(title, items, color) {
-  if (!items.length) return '';
-  const max = items[0].value;
-  const rows = items.map(({label, value}) => {
+function renderBarChart(title, items, color, emptyMsg) {
+  if (!items.length) {
+    if (!emptyMsg) return '';
+    return `<div class="bc-card"><h3>${esc(title)}</h3><div style="font-size:11px;color:var(--text-dim);padding:8px 0">${esc(emptyMsg)}</div></div>`;
+  }
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  const max = sorted[0].value;
+  const rows = sorted.map(({label, value}) => {
     const pct = max > 0 ? (value / max * 100).toFixed(1) : 0;
     return `<div class="bc-row">
       <div class="bc-label" title="${esc(label)}">${esc(label)}</div>
       <div class="bc-track"><div class="bc-fill" style="width:${pct}%;background:${color}"></div></div>
-      <div class="bc-value">${value}</div>
+      <div class="bc-value">${value.toLocaleString()}</div>
     </div>`;
   }).join('');
   return `<div class="bc-card"><h3>${esc(title)}</h3>${rows}</div>`;
 }
 
+function fmtSeconds(s) {
+  if (s >= 3600) return (s / 3600).toFixed(1) + 'h';
+  if (s >= 60) return Math.round(s / 60) + 'm';
+  return Math.round(s) + 's';
+}
+
 async function loadCharts() {
-  const [heatmap, calData, sessData, intentsData, toolsData, jStats, overview] = await Promise.all([
+  const [heatmap, calData, sessData, intentsData, toolsData, jStats, overview,
+         todData, rtData, mcData, frictionData, toolErrData, langData, bashData] = await Promise.all([
     api('/api/heatmap'),
     api('/api/heatmap/calendar'),
     api('/api/sessions?limit=50&sort=started_at+ASC'),
     api('/api/intents'),
     api('/api/tools'),
-    api('/api/judge-stats'),
+    api('/api/judgments/stats'),
     api('/api/overview'),
+    api('/api/time-of-day'),
+    api('/api/response-times'),
+    api('/api/multi-clauding'),
+    api('/api/friction'),
+    api('/api/tool-errors'),
+    api('/api/languages'),
+    api('/api/bash-commands'),
   ]);
 
   const textDim = getCSSVar('--text-dim');
   const gridColor = getCSSVar('--border');
   const greenColor = getCSSVar('--green');
 
-  // Bar charts
+  const bashCmds = (bashData.bash_commands || []).slice(0, 12);
+
+  // Bar charts row 1: What You Worked On + Top Tools + Outcomes + Trajectory
   const barGrid = document.getElementById('bar-charts-grid');
   if (barGrid) {
-    // Intents
     const intents = (intentsData.intents || [])
       .filter(i => i.intent && i.intent !== 'unknown')
       .map(i => ({ label: i.intent.replace(/_/g, ' '), value: i.count }))
       .sort((a, b) => b.value - a.value).slice(0, 8);
 
-    // Top tools
     const tools = (toolsData.tools || [])
       .map(t => ({ label: t.tool_name, value: t.total_uses }))
       .sort((a, b) => b.value - a.value).slice(0, 8);
 
-    // Outcomes
     const od = jStats.outcome_distribution || {};
     const outcomeOrder = ['completed', 'mostly_completed', 'partially_completed', 'failed', 'exploratory', 'abandoned'];
     const outcomes = outcomeOrder
@@ -3015,9 +3260,9 @@ async function loadCharts() {
       .map(k => ({ label: k.replace(/_/g, ' '), value: od[k] }))
       .sort((a, b) => b.value - a.value);
 
-    // Trajectory
+    // Trajectory: skip if all values are 'unknown' (scoring not yet run)
     const td = overview.trajectory_distribution || {};
-    const trajOrder = ['converged', 'mixed', 'drifted', 'thrashed', 'unknown'];
+    const trajOrder = ['converged', 'mixed', 'drifted', 'thrashed'];
     const trajectory = trajOrder
       .filter(k => td[k] > 0)
       .map(k => ({ label: k, value: td[k] }))
@@ -3026,9 +3271,48 @@ async function loadCharts() {
     barGrid.innerHTML = [
       renderBarChart('What You Worked On', intents, getCSSVar('--accent')),
       renderBarChart('Top Tools Used', tools, getCSSVar('--cyan')),
-      outcomes.length ? renderBarChart('Session Outcomes', outcomes, getCSSVar('--purple')) : '',
-      trajectory.length ? renderBarChart('Session Trajectory', trajectory, getCSSVar('--green')) : '',
+      outcomes.length > 1 ? renderBarChart('Session Outcomes', outcomes, getCSSVar('--purple')) : '',
+      trajectory.length > 1 ? renderBarChart('Session Trajectory', trajectory, getCSSVar('--green')) : '',
     ].filter(Boolean).join('');
+  }
+
+  // Bar charts row 2: Languages + Tool Errors + Friction + Response Times
+  const barGrid2 = document.getElementById('bar-charts-grid2');
+  if (barGrid2) {
+    const langs = (langData.languages || []).map(l => ({ label: l.label, value: l.count }));
+    const rt = (rtData.distribution || []).filter(b => b.count > 0).map(b => ({ label: b.label, value: b.count }));
+    const friction = (frictionData.friction || []).map(f => ({ label: f.label, value: f.count }));
+    const toolErrs = (toolErrData.tool_errors || []).map(e => ({ label: e.label, value: e.count }));
+
+    const langHtml = langs.length > 1
+      ? renderBarChart('Languages', langs, getCSSVar('--cyan'))
+      : renderBarChart('Languages', [], getCSSVar('--cyan'), 'Restart server + run ingest to populate');
+    const toolErrHtml = toolErrs.length > 1
+      ? renderBarChart('Tool Errors', toolErrs, getCSSVar('--red'))
+      : renderBarChart('Tool Errors', [], getCSSVar('--red'), 'Restart server + run ingest to populate');
+
+    barGrid2.innerHTML = [
+      langHtml,
+      toolErrHtml,
+      friction.length > 1 ? renderBarChart('Friction Types', friction, getCSSVar('--orange')) : '',
+      rt.length > 1 ? renderBarChart('User Response Time', rt, getCSSVar('--purple')) : '',
+      bashCmds.length > 1 ? renderBarChart('Top Bash Commands', bashCmds, getCSSVar('--green')) : '',
+    ].filter(Boolean).join('');
+  }
+
+  // Multi-clauding stats card
+  const mcSection = document.getElementById('multi-clauding-section');
+  if (mcSection && mcData) {
+    mcSection.innerHTML = `<div class="chart-card">
+      <h3>Multi-Clauding (Parallel Sessions)</h3>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;padding:4px 0">
+        <div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--accent)">${mcData.overlap_events.toLocaleString()}</div><div style="font-size:11px;color:var(--text-sec);margin-top:2px">5-min Overlap Windows</div></div>
+        <div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--accent)">${mcData.sessions_involved.toLocaleString()}</div><div style="font-size:11px;color:var(--text-sec);margin-top:2px">Sessions Involved</div></div>
+        <div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--accent)">${mcData.sessions_involved_pct}%</div><div style="font-size:11px;color:var(--text-sec);margin-top:2px">Of All Sessions</div></div>
+        ${rtData.median_seconds ? `<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--text-dim)">${fmtSeconds(rtData.median_seconds)}</div><div style="font-size:11px;color:var(--text-sec);margin-top:2px">Median Response Time</div></div>` : ''}
+        ${rtData.avg_seconds ? `<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--text-dim)">${fmtSeconds(rtData.avg_seconds)}</div><div style="font-size:11px;color:var(--text-sec);margin-top:2px">Avg Response Time</div></div>` : ''}
+      </div>
+    </div>`;
   }
 
   // Productivity trend (judged sessions only)
@@ -3260,6 +3544,41 @@ function renderHeatmap(data) {
 }
 
 // ===== REFRESH =====
+async function fillNarratives() {
+  const btn = document.getElementById('fill-narratives-btn');
+  const progressEl = document.getElementById('refresh-progress');
+  const stepEl = document.getElementById('refresh-step');
+  const concurrency = parseInt(document.getElementById('concurrency-select').value);
+  btn.disabled = true;
+  btn.textContent = 'Filling...';
+  progressEl.style.display = 'flex';
+  stepEl.textContent = 'Re-judging sessions without stories...';
+  try {
+    const resp = await fetch('/api/fill-narratives', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ concurrency }) });
+    const data = await resp.json();
+    if (!data.ok) {
+      stepEl.textContent = data.message || 'Error';
+      btn.disabled = false;
+      btn.textContent = 'Fill Stories';
+      return;
+    }
+    if (data.count === 0) {
+      stepEl.textContent = 'All sessions already have stories!';
+      setTimeout(() => { progressEl.style.display = 'none'; btn.textContent = 'Fill Stories'; btn.disabled = false; }, 2000);
+      return;
+    }
+    stepEl.textContent = `Filling narratives for ${data.count} sessions...`;
+    // Poll status like regular refresh
+    pollBackgroundStatus();
+  } catch (e) {
+    stepEl.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = 'Fill Stories';
+  }
+}
+
 async function refreshData() {
   const btn = document.getElementById('refresh-btn');
   const progressEl = document.getElementById('refresh-progress');
@@ -3270,7 +3589,7 @@ async function refreshData() {
 
   btn.disabled = true;
   btn.textContent = 'Starting...';
-  progressEl.style.display = 'block';
+  progressEl.style.display = 'flex';
   stepEl.textContent = 'Requesting refresh...';
   countEl.textContent = '';
   barEl.style.width = '0%';
@@ -3300,6 +3619,315 @@ async function refreshData() {
   }
 }
 
+// ===== NEW FEATURE FUNCTIONS =====
+
+async function analyzePrompt() {
+  const input = document.getElementById('advisor-input');
+  const result = document.getElementById('advisor-result');
+  const prompt = (input ? input.value : '').trim();
+  if (!prompt) { result.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Enter a prompt to analyze.</div>'; return; }
+  result.innerHTML = '<div class="loading"><span class="spinner"></span>Analyzing friction risk...</div>';
+  try {
+    const r = await fetch('/api/predict-friction', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt})
+    });
+    const data = await r.json();
+    if (data.error) { result.innerHTML = `<div style="color:var(--red)">${esc(data.error)}</div>`; return; }
+    const riskColors = {low: 'var(--green)', medium: '#f97316', high: 'var(--red)'};
+    const riskEmoji = {low: '✅', medium: '⚠️', high: '🔴'};
+    const color = riskColors[data.risk_level] || 'var(--text-dim)';
+    const emoji = riskEmoji[data.risk_level] || '❓';
+    let html = `<div style="border:1px solid ${color};border-radius:8px;padding:12px;background:var(--card-bg)">`;
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">`;
+    html += `<span style="font-size:20px">${emoji}</span>`;
+    html += `<span style="font-size:16px;font-weight:700;color:${color}">${esc(data.risk_level || '').toUpperCase()} RISK</span>`;
+    html += `<span style="font-size:12px;color:var(--text-dim)">score: ${((data.risk_score||0)*100).toFixed(0)}%</span>`;
+    html += `</div>`;
+    if (data.predicted_outcome) html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-style:italic">${esc(data.predicted_outcome)}</div>`;
+    if (data.risk_factors && data.risk_factors.length) {
+      html += `<div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">Risk Factors:</div>`;
+      html += `<ul style="margin:0 0 8px 16px;font-size:12px">`;
+      for (const f of data.risk_factors) html += `<li><strong>${esc(f.factor)}</strong> — ${esc(f.impact)}</li>`;
+      html += `</ul>`;
+    }
+    if (data.suggestions && data.suggestions.length) {
+      html += `<div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px">Suggested Additions:</div>`;
+      html += `<ul style="margin:0 0 0 16px;font-size:12px">`;
+      for (const s of data.suggestions) html += `<li>${esc(s)}</li>`;
+      html += `</ul>`;
+    }
+    html += `</div>`;
+    result.innerHTML = html;
+  } catch(e) {
+    result.innerHTML = `<div style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function loadLostHours() {
+  const sec = document.getElementById('lost-hours-section');
+  const content = document.getElementById('lost-hours-content');
+  try {
+    const data = await api('/api/lost-hours');
+    if (!data.total_waste_hours || data.total_waste_hours < 0.1) return;
+    sec.style.display = 'block';
+    const total = data.total_waste_hours.toFixed(1);
+    const cost = data.total_cost_usd.toFixed(2);
+    let html = `<div style="background:var(--card-bg);border:1px solid #f97316;border-radius:8px;padding:12px;margin-bottom:8px">`;
+    html += `<div style="font-size:20px;font-weight:700;color:#f97316">${total} hrs lost to friction</div>`;
+    html += `<div style="font-size:12px;color:var(--text-dim)">~$${cost} in estimated token cost</div>`;
+    html += `</div>`;
+    if (data.by_category && data.by_category.length) {
+      const maxH = Math.max(...data.by_category.map(c => c.waste_hours));
+      html += `<div style="display:flex;flex-direction:column;gap:4px">`;
+      for (const cat of data.by_category.slice(0, 8)) {
+        const pct = maxH > 0 ? (cat.waste_hours / maxH * 100) : 0;
+        const hrs = cat.waste_hours.toFixed(1);
+        html += `<div style="cursor:pointer" onclick="openFrictionDrillthrough('${esc(cat.category)}')">`;
+        html += `<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">`;
+        html += `<span>${esc(cat.category)}</span><span style="color:#f97316;font-weight:600">${hrs}h (${cat.sessions} sessions)</span>`;
+        html += `</div>`;
+        html += `<div style="height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${pct}%;background:#f97316;border-radius:3px"></div></div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+    content.innerHTML = html;
+  } catch(e) { console.warn('loadLostHours:', e); }
+}
+
+async function loadGroundhogDay() {
+  const sec = document.getElementById('groundhog-section');
+  const content = document.getElementById('groundhog-content');
+  const badge = document.getElementById('groundhog-badge');
+  try {
+    const data = await api('/api/groundhog-day');
+    if (!data.loops || !data.loops.length) return;
+    sec.style.display = 'block';
+    badge.textContent = data.loops.length + ' patterns';
+    let html = '';
+    for (const loop of data.loops.slice(0, 5)) {
+      html += `<div style="border:1px solid #f97316;border-radius:6px;padding:10px;margin-bottom:8px;background:var(--card-bg)">`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
+      html += `<div><strong style="color:#f97316">${esc(loop.pattern)}</strong> <span style="color:var(--text-dim);font-size:11px">in ${esc(loop.project)}</span></div>`;
+      html += `<span style="background:#f97316;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700">${loop.count}x</span>`;
+      html += `</div>`;
+      for (const s of loop.sessions.slice(-3)) {
+        html += `<div style="font-size:11px;color:var(--text-dim);padding:3px 0;border-top:1px solid var(--border)">`;
+        html += `<span style="color:var(--text)">${s.date}</span>`;
+        if (s.user_quote) html += ` — <em>"${esc(s.user_quote.slice(0,60))}"</em>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+    content.innerHTML = html;
+  } catch(e) { console.warn('loadGroundhogDay:', e); }
+}
+
+async function loadFrictionMap() {
+  const sec = document.getElementById('friction-map-section');
+  const content = document.getElementById('friction-map-content');
+  try {
+    const data = await api('/api/friction-pattern-map');
+    if (!data.projects || !data.projects.length || !data.patterns || !data.patterns.length) return;
+    sec.style.display = 'block';
+    const projects = data.projects;
+    const patterns = data.patterns.slice(0, 8);
+    const matrix = data.matrix;
+    // Find max value for color scaling
+    let maxVal = 1;
+    for (const p of projects) for (const pat of patterns) maxVal = Math.max(maxVal, (matrix[p] || {})[pat] || 0);
+    let html = `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">`;
+    html += `<thead><tr><th style="text-align:left;padding:4px 6px;color:var(--text-dim)">Project</th>`;
+    for (const pat of patterns) html += `<th style="padding:4px 6px;color:var(--text-dim);max-width:80px;word-break:break-word">${esc(pat)}</th>`;
+    html += `</tr></thead><tbody>`;
+    for (const proj of projects) {
+      html += `<tr><td style="padding:4px 6px;font-weight:500">${esc(proj)}</td>`;
+      for (const pat of patterns) {
+        const v = (matrix[proj] || {})[pat] || 0;
+        const alpha = maxVal > 0 ? v / maxVal : 0;
+        const bg = v > 0 ? `rgba(239,68,68,${Math.max(0.1, alpha)})` : 'transparent';
+        const title = `${proj} / ${pat}: ${v}`;
+        html += `<td style="padding:4px 6px;text-align:center;background:${bg};cursor:${v>0?'pointer':'default'};border-radius:3px" title="${esc(title)}" ${v>0?`onclick="openFrictionDrillthrough('${esc(pat)}')"`:''}>`;
+        html += v > 0 ? `<strong>${v}</strong>` : '<span style="color:var(--text-dim)">-</span>';
+        html += `</td>`;
+      }
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div>`;
+    content.innerHTML = html;
+  } catch(e) { console.warn('loadFrictionMap:', e); }
+}
+
+function renderDNA(container, sessionData) {
+  if (!container || !sessionData) return;
+  const productive = sessionData.productive_turns || 0;
+  const waste = sessionData.waste_turns || 0;
+  const total = productive + waste;
+  if (total === 0) return;
+  const W = 200, H = 8;
+  const misalignments = sessionData.misalignments || [];
+  const prodPct = productive / total;
+  const wastePct = waste / total;
+  let svg = `<svg width="${W}" height="${H}" style="border-radius:2px;display:block" title="Green=productive turns, Red=waste turns">`;
+  // Background: green (productive) from left
+  const prodW = Math.round(prodPct * W);
+  svg += `<rect x="0" y="0" width="${prodW}" height="${H}" fill="#22c55e" opacity="0.5"/>`;
+  // Red from right
+  const wasteW = W - prodW;
+  svg += `<rect x="${prodW}" y="0" width="${wasteW}" height="${H}" fill="#ef4444" opacity="0.5"/>`;
+  // Tick marks for misalignments
+  for (const m of misalignments) {
+    if (m && m.turn !== undefined) {
+      const x = Math.round((m.turn / total) * W);
+      svg += `<rect x="${x-1}" y="0" width="2" height="${H}" fill="#ef4444"/>`;
+    }
+  }
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+async function showHandoff(sessionId, btnEl) {
+  const modal = document.getElementById('handoff-modal');
+  const content = document.getElementById('handoff-modal-content');
+  modal.style.display = 'flex';
+  content.innerHTML = '<div class="loading"><span class="spinner"></span>Generating handoff memo...</div>';
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+  try {
+    const data = await api(`/api/sessions/${sessionId}/handoff`);
+    if (data.error) { content.innerHTML = `<div style="color:var(--red)">${esc(data.error)}</div>`; return; }
+    let html = `<h3 style="color:var(--accent);margin-bottom:12px">📋 Handoff Memo</h3>`;
+    if (data.accomplished) {
+      html += `<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:var(--text-dim);margin-bottom:4px">ACCOMPLISHED</div>`;
+      html += `<div style="font-size:13px">${esc(data.accomplished)}</div></div>`;
+    }
+    if (data.next_steps && data.next_steps.length) {
+      html += `<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px">NEXT STEPS</div><ul style="margin:0 0 0 16px;font-size:12px">`;
+      for (const s of data.next_steps) html += `<li>${esc(s)}</li>`;
+      html += `</ul></div>`;
+    }
+    if (data.watch_out && data.watch_out.length) {
+      html += `<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:#f97316;margin-bottom:4px">⚠️ WATCH OUT</div><ul style="margin:0 0 0 16px;font-size:12px">`;
+      for (const w of data.watch_out) html += `<li>${esc(w)}</li>`;
+      html += `</ul></div>`;
+    }
+    if (data.suggested_opening) {
+      html += `<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">🚀 SUGGESTED OPENING</div>`;
+      html += `<div style="background:var(--card-bg);border:1px solid var(--accent);border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;margin-bottom:8px">${esc(data.suggested_opening)}</div>`;
+      html += `<button class="copy-btn" style="background:var(--accent);color:#fff" data-copy="${esc(data.suggested_opening)}" onclick="navigator.clipboard.writeText(this.dataset.copy).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='📋 Copy Opening Prompt',1500)})">📋 Copy Opening Prompt</button>`;
+      html += `</div>`;
+    }
+    content.innerHTML = html;
+  } catch(e) {
+    content.innerHTML = `<div style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  } finally {
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '📋 Handoff'; }
+  }
+}
+
+function closeHandoffModal() {
+  document.getElementById('handoff-modal').style.display = 'none';
+}
+
+async function showRewritePrompt(sessionId, btnEl) {
+  const modal = document.getElementById('rewrite-modal');
+  const content = document.getElementById('rewrite-modal-content');
+  modal.style.display = 'flex';
+  content.innerHTML = '<div class="loading"><span class="spinner"></span>Rewriting prompt...</div>';
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+  try {
+    const r = await fetch(`/api/sessions/${sessionId}/rewrite-prompt`, {method:'POST'});
+    const data = await r.json();
+    if (data.error) { content.innerHTML = `<div style="color:var(--red)">${esc(data.error)}</div>`; return; }
+    let html = `<h3 style="color:var(--accent);margin-bottom:12px">✏️ Rewritten Prompt</h3>`;
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`;
+    html += `<div><div style="font-size:11px;font-weight:600;color:var(--text-dim);margin-bottom:4px">ORIGINAL</div>`;
+    html += `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:12px;white-space:pre-wrap">${esc(data.original||'')}</div></div>`;
+    html += `<div><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px">REWRITTEN</div>`;
+    html += `<div style="background:rgba(34,197,94,0.05);border:1px solid var(--green);border-radius:6px;padding:8px;font-size:12px;white-space:pre-wrap">${esc(data.rewritten||'')}</div>`;
+    if (data.rewritten) {
+      html += `<button class="copy-btn" style="margin-top:6px;background:var(--green);color:#fff" data-copy="${esc(data.rewritten)}" onclick="navigator.clipboard.writeText(this.dataset.copy).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>`;
+    }
+    html += `</div></div>`;
+    if (data.improvements && data.improvements.length) {
+      html += `<div><div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:6px">IMPROVEMENTS</div>`;
+      for (const imp of data.improvements) {
+        html += `<div style="margin-bottom:6px;font-size:12px"><strong>${esc(imp.change)}</strong> — <span style="color:var(--text-dim)">${esc(imp.reason)}</span></div>`;
+      }
+      html += `</div>`;
+    }
+    content.innerHTML = html;
+  } catch(e) {
+    content.innerHTML = `<div style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  } finally {
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '✏️ Rewrite'; }
+  }
+}
+
+function closeRewriteModal() {
+  document.getElementById('rewrite-modal').style.display = 'none';
+}
+
+async function auditRules() {
+  const btn = document.getElementById('audit-rules-btn');
+  const container = document.getElementById('claude-md-container');
+  if (btn) { btn.disabled = true; btn.textContent = 'Auditing...'; }
+  try {
+    const r = await fetch('/api/claudemd-audit', {method:'POST'});
+    const data = await r.json();
+    if (data.error && !data.audit) {
+      alert('Audit error: ' + data.error);
+      return;
+    }
+    const audit = data.audit || [];
+    // Overlay status badges on existing CLAUDE.md cards
+    const cards = container.querySelectorAll('[data-rule-text]');
+    const statusColors = {working: 'var(--green)', violated: 'var(--red)', stale: 'var(--text-dim)'};
+    const statusEmoji = {working: '✅', violated: '⚠️', stale: '💤'};
+    // Build rule→audit map
+    const auditMap = {};
+    for (const a of audit) auditMap[a.rule_text] = a;
+    // If no cards with data-rule-text, render inline
+    if (cards.length === 0) {
+      let html = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">Audit results (${audit.length} rules analyzed):</div>`;
+      for (const a of audit) {
+        const color = statusColors[a.status] || 'var(--text-dim)';
+        const emoji = statusEmoji[a.status] || '❓';
+        html += `<div style="border:1px solid ${color};border-radius:6px;padding:8px;margin-bottom:6px;background:var(--card-bg)">`;
+        html += `<div style="display:flex;justify-content:space-between;margin-bottom:4px">`;
+        html += `<span style="font-size:12px;font-weight:600">${esc(a.rule_text||'').slice(0,80)}</span>`;
+        html += `<span style="font-size:12px">${emoji} <span style="color:${color}">${esc(a.status)}</span></span>`;
+        html += `</div>`;
+        if (a.evidence) html += `<div style="font-size:11px;color:var(--text-dim)">${esc(a.evidence)}</div>`;
+        if (a.recommendation) html += `<div style="font-size:11px;color:var(--accent);margin-top:2px">${esc(a.recommendation)}</div>`;
+        html += `</div>`;
+      }
+      container.insertAdjacentHTML('afterbegin', html);
+    } else {
+      // Overlay badges on existing cards
+      for (const card of cards) {
+        const ruleText = card.getAttribute('data-rule-text');
+        const auditData = auditMap[ruleText];
+        if (!auditData) continue;
+        const color = statusColors[auditData.status] || 'var(--text-dim)';
+        const emoji = statusEmoji[auditData.status] || '❓';
+        card.style.borderColor = color;
+        const badge = document.createElement('div');
+        badge.style.cssText = `font-size:11px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)`;
+        badge.innerHTML = `${emoji} <span style="color:${color};font-weight:600">${esc(auditData.status)}</span>`;
+        if (auditData.evidence) badge.innerHTML += ` — <span style="color:var(--text-dim)">${esc(auditData.evidence)}</span>`;
+        card.appendChild(badge);
+      }
+    }
+    if (btn) btn.textContent = '✓ Audited';
+  } catch(e) {
+    alert('Audit failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; if (btn.textContent === 'Auditing...') btn.textContent = '🔍 Audit Rules'; }
+  }
+}
+
 // ===== INIT =====
 async function init() {
   const progressEl = document.getElementById('refresh-progress');
@@ -3309,7 +3937,7 @@ async function init() {
   const btn = document.getElementById('refresh-btn');
 
   // Show progress bar during initialization
-  progressEl.style.display = 'block';
+  progressEl.style.display = 'flex';
   stepEl.textContent = 'Starting up...';
   barEl.style.width = '10%';
   countEl.textContent = '';
@@ -3369,6 +3997,7 @@ async function init() {
   stepEl.textContent = 'Loading synthesis...';
   barEl.style.width = '80%';
   await loadSynthesis();
+  await Promise.all([loadLostHours(), loadGroundhogDay(), loadFrictionMap()]);
 
   stepEl.textContent = 'Loading highlights...';
   barEl.style.width = '85%';
@@ -3487,8 +4116,8 @@ async function updateBackgroundStatus(status) {
 
   if (!status.ready) {
     // Show inline progress bar (only if not already visible to avoid repaints)
-    if (progressEl.style.display !== 'block') {
-      progressEl.style.display = 'block';
+    if (progressEl.style.display !== 'flex') {
+      progressEl.style.display = 'flex';
     }
     stepEl.textContent = status.step || 'Working...';
     btn.disabled = true;
@@ -3506,6 +4135,8 @@ async function updateBackgroundStatus(status) {
     // Background work is done
     btn.disabled = false;
     btn.textContent = 'Run LLM Judge';
+    const fnBtn = document.getElementById('fill-narratives-btn');
+    if (fnBtn) { fnBtn.disabled = false; fnBtn.textContent = 'Fill Stories'; }
 
     // If we just transitioned from working to idle, reload data
     if (lastSeenState !== null && lastSeenState !== 'idle' && currentState === 'idle') {
@@ -3513,7 +4144,7 @@ async function updateBackgroundStatus(status) {
       barEl.style.width = '100%';
       countEl.textContent = '';
 
-      await Promise.all([loadVerdict(), loadChangeCards(), loadSynthesis(), loadHighlights()]);
+      await Promise.all([loadVerdict(), loadChangeCards(), loadSynthesis(), loadHighlights(), loadLostHours(), loadGroundhogDay(), loadFrictionMap()]);
       expandedSessionId = null;
       await loadSessions(false);
       _chartsLoaded = false;

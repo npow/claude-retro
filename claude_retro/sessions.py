@@ -74,21 +74,48 @@ def build_sessions():
 
 
 def build_tool_usage():
-    """Aggregate tool usage per session.
+    """Aggregate per-tool call counts, error counts, and timing per session.
 
-    Note: This function is currently simplified - it doesn't parse tool_names
-    since SQLite doesn't have UNNEST. Tool usage stats are computed in tool_use_count
-    in the sessions table instead.
+    Uses the primary tool (first in tool_names array) per assistant entry for
+    duration attribution. Duration = tool_result.timestamp - assistant.timestamp.
     """
     conn = get_writer()
 
     try:
         conn.execute("DELETE FROM session_tool_usage")
+        conn.execute("""
+            INSERT INTO session_tool_usage
+                (session_id, tool_name, use_count, error_count, total_duration_ms, avg_duration_ms)
+            SELECT
+                r.session_id,
+                json_extract(r.tool_names, '$[0]')                              AS tool_name,
+                COUNT(*)                                                         AS use_count,
+                SUM(COALESCE(tr.tool_result_error, 0))                          AS error_count,
+                COALESCE(SUM(
+                    CASE WHEN tr.timestamp_utc IS NOT NULL THEN
+                        CAST((julianday(tr.timestamp_utc) - julianday(r.timestamp_utc)) * 86400000 AS INTEGER)
+                    ELSE 0 END
+                ), 0)                                                            AS total_duration_ms,
+                AVG(
+                    CASE WHEN tr.timestamp_utc IS NOT NULL THEN
+                        CAST((julianday(tr.timestamp_utc) - julianday(r.timestamp_utc)) * 86400000 AS INTEGER)
+                    ELSE NULL END
+                )                                                                AS avg_duration_ms
+            FROM raw_entries r
+            LEFT JOIN raw_entries tr
+                   ON tr.parent_uuid = r.entry_id
+                  AND tr.is_tool_result = 1
+            WHERE r.entry_type = 'assistant'
+              AND r.tool_names IS NOT NULL
+              AND r.tool_names != '[]'
+              AND r.session_id IS NOT NULL
+              AND json_extract(r.tool_names, '$[0]') IS NOT NULL
+            GROUP BY r.session_id, json_extract(r.tool_names, '$[0]')
+        """)
         conn.commit()
     except Exception:
         conn.rollback()
         raise
 
-    # Return 0 since we're not populating this table for now
-    # The tool_use_count in sessions table provides overall tool usage stats
-    return 0
+    count = conn.execute("SELECT COUNT(*) FROM session_tool_usage").fetchone()[0]
+    return count

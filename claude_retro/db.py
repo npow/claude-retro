@@ -51,11 +51,41 @@ def _init_extra_schema(conn: sqlite3.Connection):
     _migrate_add_columns(conn, "synthesis", [
         ("workflow_prompts", "TEXT"),
         ("features_to_try", "TEXT"),
+        ("session_count", "INTEGER DEFAULT 0"),
+        ("productivity_avg", "REAL DEFAULT 0"),
+        ("friction_counts", "TEXT"),  # JSON: {type: count}
+        ("skill_levels", "TEXT"),     # JSON: {dim: level}
     ])
+    # synthesis_history — one row per judge run (previous values before overwrite)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS synthesis_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at_a_glance TEXT,
+            usage_narrative TEXT,
+            top_wins TEXT,
+            top_friction TEXT,
+            claude_md_additions TEXT,
+            fun_headline TEXT,
+            workflow_prompts TEXT,
+            features_to_try TEXT,
+            session_count INTEGER DEFAULT 0,
+            productivity_avg REAL DEFAULT 0,
+            friction_counts TEXT,
+            skill_levels TEXT,
+            generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     # session_judgments has extra columns in claude-retro
     _migrate_add_columns(conn, "session_judgments", [
         ("friction_categories", "TEXT"),
         ("estimated_cost_usd", "REAL"),
+        ("handoff_memo", "TEXT"),
+        ("rewrite_memo", "TEXT"),
+    ])
+    # session_tool_usage gains timing columns
+    _migrate_add_columns(conn, "session_tool_usage", [
+        ("total_duration_ms", "INTEGER DEFAULT 0"),
+        ("avg_duration_ms", "REAL DEFAULT 0"),
     ])
     conn.commit()
 

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agent Monitor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #0d1117; color: #c9d1d9; font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', monospace; font-size: 13px; }
+    #mount { height: 100%; }
+    #status { position: fixed; bottom: 8px; right: 12px; font-size: 11px; color: #484f58; }
+  </style>
+</head>
+<body>
+  <div id="mount"></div>
+  <div id="status">connecting…</div>
+  <script type="module">
+    // ViewContext implementation backed by /api/live polling
+    import ProcessMonitorView from '/viewer/process-monitor.js';
+
+    const POLL_MS = 2000;
+
+    // Registered event handlers
+    const _handlers = {};
+    // Previous poll result: Map<id, agent>
+    let _prevMap = new Map();
+    // Agent list passed to view
+    let _agents = [];
+    // The mounted view
+    let _view = null;
+
+    function fire(type, agentId, timestamp, payload) {
+      const evt = { type, agentId, timestamp: timestamp || new Date().toISOString(), payload: payload || {} };
+      const cbs = _handlers[type] || [];
+      cbs.forEach(cb => { try { cb(evt); } catch(e) { console.error('handler error', e); } });
+    }
+
+    function upsertAgent(a) {
+      const idx = _agents.findIndex(x => x.id === a.id);
+      if (idx >= 0) _agents[idx] = a;
+      else _agents.push(a);
+    }
+
+    function removeAgent(id) {
+      _agents = _agents.filter(a => a.id !== id);
+    }
+
+    const ctx = {
+      container: null,  // set before mount
+      get agents() { return _agents; },
+
+      on(eventType, callback) {
+        if (!_handlers[eventType]) _handlers[eventType] = [];
+        _handlers[eventType].push(callback);
+        return () => {
+          _handlers[eventType] = (_handlers[eventType] || []).filter(cb => cb !== callback);
+        };
+      },
+
+      emit(eventType, payload) {
+        // Handle focus_agent: open session in retro
+        if (eventType === 'focus_agent' && payload && payload.agentId) {
+          const a = _agents.find(x => x.id === payload.agentId);
+          if (a && a.sessionId) {
+            window.open(`/?session=${a.sessionId}`, '_blank');
+          }
+        }
+      },
+
+      navigate(path) {
+        window.location.href = path;
+      },
+    };
+
+    async function poll() {
+      try {
+        const res = await fetch('/api/live');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { agents } = await res.json();
+
+        const curr = new Map(agents.map(a => [a.id, a]));
+
+        // New or updated agents
+        for (const [id, a] of curr) {
+          const prev = _prevMap.get(id);
+          upsertAgent(a);
+
+          if (!prev) {
+            // Brand new agent
+            fire('agent_created', id, a.startedAt || a.lastActivityAt);
+            if (a.currentTool) {
+              fire('tool_start', id, a.toolStartedAt || a.lastActivityAt, { tool: a.currentTool });
+            }
+          } else {
+            // Existing agent — diff tool state
+            const prevTool = prev.currentTool;
+            const currTool = a.currentTool;
+            if (!prevTool && currTool) {
+              fire('tool_start', id, a.toolStartedAt || a.lastActivityAt, { tool: currTool });
+            } else if (prevTool && !currTool) {
+              fire('tool_done', id, a.lastActivityAt, { tool: prevTool });
+            } else if (prevTool && currTool && prevTool !== currTool) {
+              fire('tool_done', id, a.lastActivityAt, { tool: prevTool });
+              fire('tool_start', id, a.toolStartedAt || a.lastActivityAt, { tool: currTool });
+            }
+            if ((prev.status || 'idle') !== (a.status || 'idle')) {
+              fire('status_changed', id, a.lastActivityAt, { status: a.status });
+            }
+          }
+          // Always sync row data (cost, turns, context, toolStartedAt) on every poll
+          fire('turn_complete', id, a.lastActivityAt);
+        }
+
+        // Removed agents
+        for (const [id] of _prevMap) {
+          if (!curr.has(id)) {
+            const prev = _prevMap.get(id);
+            if (prev && prev.currentTool) {
+              fire('tool_done', id, new Date().toISOString(), { tool: prev.currentTool });
+            }
+            removeAgent(id);
+            fire('agent_removed', id, new Date().toISOString());
+          }
+        }
+
+        _prevMap = curr;
+        document.getElementById('status').textContent = `updated ${new Date().toLocaleTimeString()}`;
+      } catch (err) {
+        console.error('poll error', err);
+        document.getElementById('status').textContent = `error: ${err.message}`;
+      }
+    }
+
+    // Mount view once DOM is ready
+    window.addEventListener('DOMContentLoaded', () => {
+      ctx.container = document.getElementById('mount');
+      _view = ProcessMonitorView;
+      ProcessMonitorView.mount(ctx);
+
+      // Start polling
+      poll();
+      setInterval(poll, POLL_MS);
+    });
+  </script>
+</body>
+</html>

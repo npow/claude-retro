@@ -46,6 +46,11 @@ class IngestionWorker(threading.Thread):
         with self._refresh_lock:
             self._refresh_request = {"concurrency": concurrency}
 
+    def request_fill_narratives(self, concurrency: int = 12):
+        """Request a fill-narratives pass: re-judge sessions missing narrative text."""
+        with self._refresh_lock:
+            self._refresh_request = {"concurrency": concurrency, "fill_narratives": True}
+
     @property
     def is_busy(self) -> bool:
         return self.status.get("state") not in ("idle",)
@@ -68,7 +73,10 @@ class IngestionWorker(threading.Thread):
                         self._refresh_request = None
 
                 if req:
-                    self._run_full_refresh(req.get("concurrency", 12))
+                    if req.get("fill_narratives"):
+                        self._run_fill_narratives(req.get("concurrency", 12))
+                    else:
+                        self._run_full_refresh(req.get("concurrency", 12))
                 elif self._has_changes():
                     # Simple mtime-based polling
                     self._run_pipeline()
@@ -207,4 +215,31 @@ class IngestionWorker(threading.Thread):
         self._set_status("Regenerating prescriptions", 2, 2)
         generate_prescriptions()
 
+        self._set_idle()
+
+    def _run_fill_narratives(self, concurrency: int = 12):
+        """Re-judge only sessions that are missing narrative text."""
+        from .llm_judge import judge_sessions
+
+        def on_progress(done, total, ok, errors):
+            self._set_status(
+                f"Filling narratives ({ok} ok, {errors} errors)",
+                current=done,
+                total=total,
+                state="judging",
+            )
+
+        self._set_status("Counting sessions without narratives", 0, 0, state="judging")
+        judged = judge_sessions(
+            fill_narratives=True,
+            concurrency=concurrency,
+            progress_callback=on_progress,
+        )
+        if judged > 0:
+            from .baselines import compute_baselines
+            from .prescriptions import generate_prescriptions
+            self._set_status("Recomputing baselines", 1, 2)
+            compute_baselines()
+            self._set_status("Regenerating prescriptions", 2, 2)
+            generate_prescriptions()
         self._set_idle()

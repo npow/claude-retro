@@ -527,7 +527,8 @@ def judge_session(session_id: str, conn) -> dict:
 
 
 def judge_sessions(
-    force: bool = False, concurrency: int = CONCURRENCY, progress_callback=None
+    force: bool = False, concurrency: int = CONCURRENCY, progress_callback=None,
+    fill_narratives: bool = False,
 ) -> int:
     """Judge all unjudged sessions (incremental). Returns count judged.
 
@@ -535,6 +536,8 @@ def judge_sessions(
     calls in parallel too, so peak subprocess count is 2*concurrency).
 
     progress_callback(done, total, ok, errors) is called after each session completes.
+
+    fill_narratives=True: only re-judge sessions that have a judgment but no narrative.
     """
     from .db import get_writer
 
@@ -549,6 +552,16 @@ def judge_sessions(
             "SELECT session_id, user_prompt_count FROM sessions WHERE turn_count >= ? ORDER BY started_at",
             [min_turns],
         ).fetchall()
+    elif fill_narratives:
+        # Re-judge sessions that have a judgment but are missing narrative text
+        session_rows = conn.execute("""
+            SELECT s.session_id, s.user_prompt_count
+            FROM sessions s
+            JOIN session_judgments j ON s.session_id = j.session_id
+            WHERE s.turn_count >= ?
+              AND (j.narrative IS NULL OR j.narrative = '')
+            ORDER BY s.started_at
+        """, [min_turns]).fetchall()
     else:
         session_rows = conn.execute("""
             SELECT s.session_id, s.user_prompt_count
@@ -851,21 +864,76 @@ def generate_synthesis():
         print(f"  Warning: synthesis JSON parse failed: {raw[:200]}", file=sys.stderr)
         return
 
+    # Compute snapshot metrics for delta tracking
+    metrics = conn.execute("""
+        SELECT COUNT(*) as session_count,
+               AVG(j.productivity_ratio) as productivity_avg
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+    """).fetchone()
+    snap_session_count = metrics[0] or 0
+    snap_productivity_avg = metrics[1] or 0.0
+
+    # Friction: total misalignment count and avg per session
+    friction_row = conn.execute("""
+        SELECT COUNT(*), AVG(j.misalignment_count)
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+    """).fetchone()
+    snap_friction = {
+        "total_misalignments": friction_row[0] or 0,
+        "avg_per_session": round(friction_row[1] or 0, 2),
+    }
+
+    # Skill levels snapshot
+    skill_rows = conn.execute("""
+        SELECT dimension_id, current_level FROM skill_profile
+    """).fetchall()
+    snap_skills = {r[0]: r[1] for r in skill_rows}
+
+    # Archive current synthesis to history BEFORE overwriting
+    existing = wconn.execute("SELECT * FROM synthesis WHERE id = 1").fetchone()
+    if existing:
+        cols = [d[0] for d in wconn.execute("SELECT * FROM synthesis WHERE id = 1").description]
+        row_dict = dict(zip(cols, existing))
+        wconn.execute("""
+            INSERT INTO synthesis_history
+            (at_a_glance, usage_narrative, top_wins, top_friction, claude_md_additions,
+             fun_headline, workflow_prompts, features_to_try, session_count, productivity_avg,
+             friction_counts, skill_levels, generated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            row_dict.get("at_a_glance"), row_dict.get("usage_narrative"),
+            row_dict.get("top_wins"), row_dict.get("top_friction"),
+            row_dict.get("claude_md_additions"), row_dict.get("fun_headline"),
+            row_dict.get("workflow_prompts"), row_dict.get("features_to_try"),
+            row_dict.get("session_count", 0), row_dict.get("productivity_avg", 0),
+            row_dict.get("friction_counts"), row_dict.get("skill_levels"),
+            row_dict.get("generated_at"),
+        ])
+
     # Store in synthesis table
     wconn.execute("DELETE FROM synthesis")
     wconn.execute(
         """INSERT INTO synthesis (id, at_a_glance, usage_narrative, top_wins, top_friction,
-           claude_md_additions, fun_headline, workflow_prompts, features_to_try)
-           VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           claude_md_additions, fun_headline, workflow_prompts, features_to_try,
+           session_count, productivity_avg, friction_counts, skill_levels)
+           VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             json.dumps(parsed.get("at_a_glance", {})),
             parsed.get("usage_narrative", ""),
             json.dumps(parsed.get("top_wins", [])),
-            json.dumps(parsed.get("top_friction", [])),  # now includes user_quote per item
+            json.dumps(parsed.get("top_friction", [])),
             json.dumps(parsed.get("claude_md_additions", [])),
             parsed.get("fun_headline", ""),
             json.dumps(parsed.get("workflow_prompts", [])),
             json.dumps(parsed.get("features_to_try", [])),
+            snap_session_count,
+            snap_productivity_avg,
+            json.dumps(snap_friction),
+            json.dumps(snap_skills),
         ],
     )
     wconn.commit()
@@ -1039,3 +1107,368 @@ def _append_rules_to_claude_md(claude_md: Path, rules: list[str]) -> bool:
     claude_md.write_text(new_content)
     print(f"    Updated {claude_md} (+{new_count} new, {len(merged)} total rules)")
     return True
+
+
+# ---------------------------------------------------------------------------
+# On-demand LLM functions for new features
+# ---------------------------------------------------------------------------
+
+_REWRITE_PROMPT_TEMPLATE = """\
+You are a Claude Code session coach helping a user write better prompts.
+
+ORIGINAL OPENING PROMPT:
+{original_prompt}
+
+SESSION OUTCOME:
+- What failed: {what_failed}
+- Top misalignments:
+{misalignments}
+- User's top recurring friction (from all sessions): {recurring_patterns}
+
+Rewrite the opening prompt to prevent the friction that occurred.
+Respond with ONLY a JSON object (no markdown, no backticks):
+{{
+  "original": "the original prompt text (copy verbatim)",
+  "rewritten": "the improved prompt text",
+  "improvements": [
+    {{"change": "what changed", "reason": "why this prevents the friction"}}
+  ],
+  "key_additions": ["specific thing added 1", "specific thing added 2"]
+}}
+"""
+
+
+def rewrite_prompt(session_id: str, conn) -> dict:
+    """Rewrite the opening prompt for a session to reduce friction. Caches result."""
+    from .db import get_writer
+
+    row = conn.execute("""
+        SELECT j.what_failed, j.misalignments, j.prompt_summary,
+               s.first_prompt, j.rewrite_memo
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.session_id = ?
+    """, [session_id]).fetchone()
+
+    if not row:
+        return {"error": "Session not found or not judged"}
+
+    what_failed, mis_json, prompt_summary, first_prompt, cached = row
+
+    if cached:
+        try:
+            return json.loads(cached)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Collect top recurring friction from recent sessions (raw descriptions)
+    recent_mis = conn.execute("""
+        SELECT misalignments FROM session_judgments
+        WHERE misalignments IS NOT NULL AND misalignments != '[]'
+        ORDER BY rowid DESC LIMIT 30
+    """).fetchall()
+    desc_counts = {}
+    for (raw,) in recent_mis:
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else (raw or [])
+            for item in items:
+                desc = (item.get("description", "") if isinstance(item, dict) else str(item))[:80]
+                if desc:
+                    desc_counts[desc] = desc_counts.get(desc, 0) + 1
+        except Exception:
+            pass
+    top_recurring = "; ".join(
+        d for d, _ in sorted(desc_counts.items(), key=lambda x: -x[1])[:3]
+    ) or "none detected"
+
+    misalignments_text = "(none)"
+    if mis_json:
+        try:
+            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            descs = [
+                (item.get("description", "") if isinstance(item, dict) else str(item))
+                for item in items[:3]
+            ]
+            misalignments_text = "\n".join(f"- {d}" for d in descs if d)
+        except Exception:
+            pass
+
+    prompt = _REWRITE_PROMPT_TEMPLATE.format(
+        original_prompt=first_prompt or prompt_summary or "(no prompt)",
+        what_failed=what_failed or "(nothing failed)",
+        misalignments=misalignments_text,
+        recurring_patterns=top_recurring,
+    )
+
+    raw = call_claude(prompt)
+    try:
+        result = _parse_json_response(raw)
+    except (json.JSONDecodeError, ValueError):
+        result = {"error": f"Parse failed: {raw[:200]}"}
+
+    wconn = get_writer()
+    wconn.execute(
+        "UPDATE session_judgments SET rewrite_memo = ? WHERE session_id = ?",
+        [json.dumps(result), session_id],
+    )
+    wconn.commit()
+    return result
+
+
+_PREDICT_FRICTION_TEMPLATE = """\
+You are analyzing an opening prompt to predict friction risks based on the user's historical patterns.
+
+OPENING PROMPT TO ANALYZE:
+{prompt_text}
+
+USER'S TOP RECURRING FRICTION PATTERNS (from past sessions):
+{top_patterns}
+
+SESSION STATS: {friction_stats}
+
+Analyze this prompt for friction risk based on the user's known patterns.
+Respond with ONLY a JSON object (no markdown, no backticks):
+{{
+  "risk_score": 0.0-1.0,
+  "risk_level": "low" | "medium" | "high",
+  "risk_factors": [
+    {{"factor": "what's risky in this prompt", "impact": "how it could cause friction given user's patterns"}}
+  ],
+  "suggestions": ["specific addition/change to prevent friction 1", "specific addition/change 2"],
+  "predicted_outcome": "1-2 sentences on likely session outcome if prompt is used as-is"
+}}
+"""
+
+
+def predict_friction(prompt_text: str, conn) -> dict:
+    """Predict friction risk for a new prompt based on historical patterns."""
+    # Gather top recurring friction from recent sessions (raw text)
+    recent_mis = conn.execute("""
+        SELECT misalignments FROM session_judgments
+        WHERE misalignments IS NOT NULL AND misalignments != '[]'
+        ORDER BY rowid DESC LIMIT 50
+    """).fetchall()
+
+    desc_counts = {}
+    for (raw,) in recent_mis:
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else (raw or [])
+            for item in items:
+                desc = (item.get("description", "") if isinstance(item, dict) else str(item))[:80]
+                if desc:
+                    desc_counts[desc] = desc_counts.get(desc, 0) + 1
+        except Exception:
+            pass
+
+    top_patterns_text = "\n".join(
+        f"- ({cnt}x) {desc}" for desc, cnt in
+        sorted(desc_counts.items(), key=lambda x: -x[1])[:8]
+    ) or "No patterns detected yet"
+
+    stats_row = conn.execute("""
+        SELECT COUNT(*), AVG(misalignment_count), AVG(productivity_ratio)
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+    """).fetchone()
+    total, avg_mis, avg_prod = stats_row or (0, 0, 0)
+    friction_stats = (
+        f"{total} sessions analyzed, avg {(avg_mis or 0):.1f} misalignments/session, "
+        f"{(avg_prod or 0):.0%} avg productivity"
+    )
+
+    prompt = _PREDICT_FRICTION_TEMPLATE.format(
+        prompt_text=prompt_text[:2000],
+        top_patterns=top_patterns_text,
+        friction_stats=friction_stats,
+    )
+
+    raw = call_claude(prompt)
+    try:
+        result = _parse_json_response(raw)
+    except (json.JSONDecodeError, ValueError):
+        result = {
+            "risk_score": 0.5,
+            "risk_level": "medium",
+            "risk_factors": [],
+            "suggestions": [],
+            "predicted_outcome": f"Parse failed: {raw[:200]}",
+        }
+    return result
+
+
+_HANDOFF_TEMPLATE = """\
+You are generating a session handoff memo to help start the next Claude Code session effectively.
+
+SESSION SUMMARY:
+- Project: {project}
+- What was asked: {prompt_summary}
+- Outcome: {outcome}
+- What worked: {what_worked}
+- What failed: {what_failed}
+- Narrative: {narrative}
+
+Generate a concise handoff memo.
+Respond with ONLY a JSON object (no markdown, no backticks):
+{{
+  "accomplished": "1-2 sentences: what was actually completed in this session",
+  "next_steps": ["specific next step 1", "specific next step 2", "specific next step 3"],
+  "watch_out": ["gotcha or pitfall to avoid next time 1", "gotcha 2"],
+  "suggested_opening": "A complete, copy-paste ready opening prompt for the NEXT session. 2-4 sentences. Include: what was accomplished (context), what still needs to be done, and any constraints to keep in mind."
+}}
+"""
+
+
+def generate_handoff(session_id: str, conn) -> dict:
+    """Generate a handoff memo for a session. Caches result in handoff_memo column."""
+    from .db import get_writer
+
+    row = conn.execute("""
+        SELECT j.narrative, j.what_worked, j.what_failed, j.outcome,
+               j.prompt_summary, s.project_name, j.handoff_memo
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.session_id = ?
+    """, [session_id]).fetchone()
+
+    if not row:
+        return {"error": "Session not found or not judged"}
+
+    narrative, what_worked, what_failed, outcome, prompt_summary, project, cached = row
+
+    if cached:
+        try:
+            return json.loads(cached)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+
+    prompt = _HANDOFF_TEMPLATE.format(
+        project=short_project,
+        prompt_summary=prompt_summary or "(no summary)",
+        outcome=outcome or "unknown",
+        what_worked=what_worked or "(nothing noted)",
+        what_failed=what_failed or "(nothing failed)",
+        narrative=(narrative or "")[:500],
+    )
+
+    raw = call_claude(prompt)
+    try:
+        result = _parse_json_response(raw)
+    except (json.JSONDecodeError, ValueError):
+        result = {"error": f"Parse failed: {raw[:200]}"}
+
+    wconn = get_writer()
+    wconn.execute(
+        "UPDATE session_judgments SET handoff_memo = ? WHERE session_id = ?",
+        [json.dumps(result), session_id],
+    )
+    wconn.commit()
+    return result
+
+
+_CLAUDEMD_AUDIT_TEMPLATE = """\
+You are auditing CLAUDE.md rules against recent session friction data.
+
+CURRENT CLAUDE.MD RULES:
+{rules}
+
+RECENT MISALIGNMENT DESCRIPTIONS (last 20 sessions):
+{misalignments}
+
+FRICTION STATS: {friction_rate}
+
+For each rule, determine its status:
+- "working": friction related to this rule has decreased or is absent in recent sessions
+- "violated": sessions still show friction this rule was meant to prevent
+- "stale": rule covers friction not present in recent sessions (possibly solved/irrelevant)
+
+Respond with ONLY a JSON object (no markdown, no backticks):
+{{
+  "audit": [
+    {{
+      "rule_text": "the rule text exactly as given",
+      "status": "working" | "violated" | "stale",
+      "violation_rate": 0.0-1.0,
+      "evidence": "specific evidence from the session data",
+      "recommendation": "keep | remove | revise: what to do with this rule"
+    }}
+  ]
+}}
+"""
+
+
+def audit_claudemd(conn) -> dict:
+    """Audit current CLAUDE.md rules against recent session friction data."""
+    synth_row = conn.execute(
+        "SELECT claude_md_additions FROM synthesis WHERE id = 1"
+    ).fetchone()
+
+    rules = []
+    if synth_row and synth_row[0]:
+        try:
+            additions = json.loads(synth_row[0]) if isinstance(synth_row[0], str) else (synth_row[0] or [])
+            for a in additions:
+                rule = a.get("rule", "").strip()
+                if rule:
+                    rules.append(rule)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    session_rules_rows = conn.execute("""
+        SELECT DISTINCT claude_md_suggestion FROM session_judgments
+        WHERE claude_md_suggestion IS NOT NULL AND claude_md_suggestion != ''
+        LIMIT 15
+    """).fetchall()
+    for (r,) in session_rules_rows:
+        if r and r.strip() and r.strip() not in rules:
+            rules.append(r.strip())
+
+    if not rules:
+        return {"audit": [], "message": "No CLAUDE.md rules found in synthesis data"}
+
+    mis_rows = conn.execute("""
+        SELECT j.misalignments FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE j.misalignments IS NOT NULL AND j.misalignments != '[]'
+          AND s.turn_count >= 1
+        ORDER BY s.started_at DESC
+        LIMIT 20
+    """).fetchall()
+
+    mis_descs = []
+    for (raw,) in mis_rows:
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else (raw or [])
+            for item in items:
+                desc = item.get("description", "") if isinstance(item, dict) else str(item)
+                if desc:
+                    mis_descs.append(f"- {desc[:120]}")
+        except Exception:
+            pass
+
+    stats_row = conn.execute("""
+        SELECT COUNT(*), SUM(CASE WHEN misalignment_count > 0 THEN 1 ELSE 0 END)
+        FROM session_judgments j
+        JOIN sessions s ON j.session_id = s.session_id
+        WHERE s.turn_count >= 1
+    """).fetchone()
+    total, with_mis = stats_row or (0, 0)
+    friction_rate = (
+        f"{with_mis or 0}/{total or 1} sessions had misalignments "
+        f"({((with_mis or 0) / max(total or 1, 1)):.0%} rate)"
+    )
+
+    prompt = _CLAUDEMD_AUDIT_TEMPLATE.format(
+        rules="\n".join(f"{i+1}. {r}" for i, r in enumerate(rules[:20])),
+        misalignments="\n".join(mis_descs[:40]) or "(no recent misalignments)",
+        friction_rate=friction_rate,
+    )
+
+    raw = call_claude(prompt)
+    try:
+        result = _parse_json_response(raw)
+    except (json.JSONDecodeError, ValueError):
+        result = {"audit": [], "error": f"Parse failed: {raw[:200]}"}
+    return result

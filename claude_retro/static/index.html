@@ -2720,7 +2720,7 @@ function switchTab(tabName) {
 // ===== SKILLS (radar + legend in verdict) =====
 function renderSkillRadar(dims, profile) {
   const n = dims.length;
-  const sz = 200, cx = sz / 2, cy = sz / 2, r = 72;
+  const sz = 240, cx = sz / 2, cy = sz / 2, r = 72;
   const pt = (i, f) => {
     const a = (2 * Math.PI * i / n) - Math.PI / 2;
     return [cx + f * r * Math.cos(a), cy + f * r * Math.sin(a)];
@@ -2745,16 +2745,25 @@ function renderSkillRadar(dims, profile) {
   const scores = dims.map(d => Math.min((profile['d' + parseInt(d.id.slice(1)) + '_score'] || 0) / 5, 1));
   const polyPts = dims.map((_, i) => { const [x, y] = pt(i, scores[i]); return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
   svg += `<polygon points="${polyPts}" fill="var(--purple)" fill-opacity="0.2" stroke="var(--purple)" stroke-width="1.5" stroke-linejoin="round"/>`;
-  // Colored vertex dots + axis-end dots
+  // Axis labels + colored vertex dots + axis-end dots
   dims.forEach((d, i) => {
     const score = profile['d' + parseInt(d.id.slice(1)) + '_score'] || 0;
     const [vx, vy] = pt(i, scores[i]);
     const [ax, ay] = pt(i, 1.0);
-    // Axis endpoint dot
-    svg += `<circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="2.5" fill="${d.color}" opacity="0.4"/>`;
+    const a = (2 * Math.PI * i / n) - Math.PI / 2;
+    const lf = 1.32;
+    const lx = cx + lf * r * Math.cos(a);
+    const ly = cy + lf * r * Math.sin(a);
+    const anchor = Math.cos(a) > 0.25 ? 'start' : Math.cos(a) < -0.25 ? 'end' : 'middle';
+    const baseline = Math.sin(a) < -0.25 ? 'auto' : Math.sin(a) > 0.25 ? 'hanging' : 'middle';
+    // Axis label
+    svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="8.5" fill="${d.color}" text-anchor="${anchor}" dominant-baseline="${baseline}" opacity="0.85">${d.short}</text>`;
+    // Axis endpoint dot (larger hit area via transparent circle)
+    svg += `<circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="6" fill="transparent"><title>${d.name}</title></circle>`;
+    svg += `<circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="2.5" fill="${d.color}" opacity="0.5" pointer-events="none"/>`;
     // Score dot
     if (scores[i] > 0.05) {
-      svg += `<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="3.5" fill="${d.color}" stroke="var(--bg)" stroke-width="1"><title>${d.short}: L${Math.floor(score)} (${score.toFixed(1)})</title></circle>`;
+      svg += `<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="3.5" fill="${d.color}" stroke="var(--bg)" stroke-width="1"><title>${d.name}: L${Math.floor(score)} (${score.toFixed(1)})</title></circle>`;
     }
   });
   svg += '</svg>';

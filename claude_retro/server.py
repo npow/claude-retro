@@ -441,7 +441,8 @@ def api_session_rich_timeline(session_id):
     if not jsonl_path.exists():
         return jsonify({"error": "JSONL not found", "timeline": []}), 404
 
-    MAX = 400
+    MAX_TEXT = 400    # assistant text / tool inputs
+    MAX_RESULT = 100_000  # tool results — send full content, UI handles collapse
     turns = []
 
     with open(jsonl_path, "r", errors="replace") as f:
@@ -477,7 +478,7 @@ def api_session_rich_timeline(session_id):
             }
 
             if isinstance(content, str):
-                turn["text"] = content[:MAX]
+                turn["text"] = content[:MAX_TEXT]
             elif isinstance(content, list):
                 text_parts = []
                 for block in content:
@@ -490,7 +491,7 @@ def api_session_rich_timeline(session_id):
                         turn["tools"].append({
                             "name": block.get("name", ""),
                             "id": block.get("id", ""),
-                            "input_preview": inp_str[:MAX],
+                            "input_preview": inp_str[:MAX_TEXT],
                         })
                     elif btype == "tool_result":
                         turn["is_tool_result"] = True
@@ -501,9 +502,9 @@ def api_session_rich_timeline(session_id):
                             rc = " ".join(
                                 b.get("text", "") for b in rc if b.get("type") == "text"
                             )
-                        turn["result_preview"] = str(rc)[:MAX] if rc else None
+                        turn["result_preview"] = str(rc)[:MAX_RESULT] if rc else None
                 if text_parts:
-                    turn["text"] = "\n".join(text_parts)[:MAX]
+                    turn["text"] = "\n".join(text_parts)[:MAX_TEXT]
 
             turns.append(turn)
 

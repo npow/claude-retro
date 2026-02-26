@@ -462,6 +462,9 @@ a:hover { text-decoration: underline; }
 .tl-tool-input { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
 .tl-tool-result { font-size: 10px; margin-top: 2px; padding: 2px 6px; border-radius: 3px; background: color-mix(in srgb, var(--green) 8%, transparent); color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
 .tl-tool-result.tl-result-err { background: color-mix(in srgb, var(--red) 8%, transparent); color: var(--red); }
+.tl-result-body { max-height: 80px; overflow: hidden; }
+.tl-result-body.expanded { max-height: none; }
+.tl-expand-btn { font-size: 10px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2px 0; display: block; }
 
 /* Load more */
 .load-more {
@@ -1512,8 +1515,9 @@ async function loadVerdict() {
       ${statCard(overview.total_sessions, 'Sessions', unjudged > 0 ? unjudged + ' unjudged' : '')}
       ${statCard(completed, 'Completed', partial + ' partial, ' + failed + ' failed')}
       ${statCard(fmtPct(prodPct), 'Productivity')}
-      ${overview.estimated_cost_usd > 0 ? statCard('~$' + overview.estimated_cost_usd.toFixed(2), 'Est. Cost', fmtTokens(overview.total_input_tokens + overview.total_output_tokens) + ' tokens') : ''}
-      ${statCard(fmtTokens(overview.total_tool_calls || 0), 'Tool Calls')}
+      ${overview.estimated_cost_usd > 0 ? statCard('~$' + overview.estimated_cost_usd.toFixed(2), 'Est. Cost') : ''}
+      ${statCard(fmtTokens((overview.total_input_tokens || 0) + (overview.total_output_tokens || 0)), 'Tokens', (overview.total_input_tokens ? fmtTokens(overview.total_input_tokens) + ' in' : '') + (overview.total_output_tokens ? ' / ' + fmtTokens(overview.total_output_tokens) + ' out' : ''))}
+      ${statCard((overview.total_tool_calls || 0).toLocaleString(), 'Tool Calls')}
       ${statCard(overview.active_days, 'Active Days')}
     </div>
     <div style="display:flex;gap:16px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-muted)">
@@ -1856,6 +1860,13 @@ function renderFeaturesToTry(features) {
     </div>
   `).join('');
   section.style.display = 'block';
+}
+
+function toggleResult(uid, btn) {
+  const body = document.getElementById(uid);
+  const expanded = body.classList.toggle('expanded');
+  const chars = body.textContent.length;
+  btn.textContent = expanded ? '▲ show less' : '▼ show more (' + chars.toLocaleString() + ' chars)';
 }
 
 function copyWorkflow(btn) {
@@ -2353,8 +2364,17 @@ async function toggleSession(sessionId, cardEl) {
     let resultHtml = '';
     if (res) {
       const resCls = res.is_error ? 'tl-tool-result tl-result-err' : 'tl-tool-result';
-      const resText = res.preview ? esc(truncate(res.preview, 200)) : (res.is_error ? 'error' : 'ok');
-      resultHtml = `<div class="${resCls}">${resText}</div>`;
+      const full = res.preview || (res.is_error ? 'error' : 'ok');
+      const COLLAPSE_AT = 300;
+      if (full.length > COLLAPSE_AT) {
+        const uid = 'tr-' + Math.random().toString(36).slice(2,8);
+        resultHtml = `<div class="${resCls}">` +
+          `<div class="tl-result-body" id="${uid}">${esc(full)}</div>` +
+          `<button class="tl-expand-btn" onclick="toggleResult('${uid}',this)">▼ show more (${full.length.toLocaleString()} chars)</button>` +
+          `</div>`;
+      } else {
+        resultHtml = `<div class="${resCls}">${esc(full)}</div>`;
+      }
     }
 
     return `<div class="tl-tool-call">

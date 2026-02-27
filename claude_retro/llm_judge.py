@@ -16,7 +16,7 @@ CONCURRENCY = 12
 
 # Defaults — override with ANTHROPIC_BASE_URL / ANTHROPIC_API_KEY / CLAUDE_RETRO_MODEL
 _DEFAULT_BASE_URL = "http://localhost:8082"
-_DEFAULT_MODEL = "haiku"
+_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
 
 def _get_client() -> Anthropic:

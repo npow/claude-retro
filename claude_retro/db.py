@@ -1,23 +1,23 @@
-"""SQLite database — thin wrapper around agenttrace.db.
+"""SQLite database — thin wrapper around sessionlog.db.
 
 All connection management, WAL mode, and base schema (raw_entries, sessions,
-session_features, progress_entries, etc.) live in agenttrace.db.
+session_features, progress_entries, etc.) live in sessionlog.db.
 
 This module re-exports those functions and applies the additional
 claude-retro-specific schema extensions (extra columns on synthesis and
 session_judgments) on top of the base schema.
 
 DB_PATH is determined by the CLAUDE_RETRO_DB env var (defaulted in config.py
-before any agenttrace import can read it).
+before any sessionlog import can read it).
 """
 
 import sqlite3
 
 # config.py must be imported first — it sets CLAUDE_RETRO_DB default so that
-# agenttrace.config reads the correct path when it first imports.
+# sessionlog.config reads the correct path when it first imports.
 from .config import DB_PATH  # noqa: F401 — re-exported for __main__.py reset command
 
-from agenttrace.db import (
+from sessionlog.db import (
     get_writer as _at_get_writer,
     get_reader,
     get_conn,
@@ -48,8 +48,8 @@ def _migrate_add_columns(conn: sqlite3.Connection, table: str, columns: list):
 
 
 def _init_extra_schema(conn: sqlite3.Connection):
-    """Apply claude-retro-specific schema extensions on top of the agenttrace base."""
-    # synthesis has extra columns in claude-retro not present in agenttrace
+    """Apply claude-retro-specific schema extensions on top of the sessionlog base."""
+    # synthesis has extra columns in claude-retro not present in sessionlog
     _migrate_add_columns(
         conn,
         "synthesis",
@@ -110,7 +110,7 @@ _extra_initialized = False
 def get_writer() -> sqlite3.Connection:
     """Get the serialized writer connection with full schema.
 
-    Calls agenttrace's get_writer (which creates the base schema), then
+    Calls sessionlog's get_writer (which creates the base schema), then
     applies claude-retro-specific schema extensions once per process.
     """
     global _extra_initialized

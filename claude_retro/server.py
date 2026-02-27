@@ -3150,7 +3150,7 @@ def api_claudemd_audit():
 _PROCESS_MONITOR_JS = (
     Path.home()
     / "code"
-    / "agenttrace"
+    / "sessionlog"
     / "views"
     / "process-monitor"
     / "dist"

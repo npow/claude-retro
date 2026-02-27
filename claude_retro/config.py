@@ -3,8 +3,8 @@
 import os
 from pathlib import Path
 
-# Ensure agenttrace (which also reads CLAUDE_RETRO_DB) uses our default DB path.
-# Must run before any agenttrace import.
+# Ensure sessionlog (which also reads CLAUDE_RETRO_DB) uses our default DB path.
+# Must run before any sessionlog import.
 os.environ.setdefault("CLAUDE_RETRO_DB", str(Path.home() / ".claude" / "retro.sqlite"))
 
 # Paths

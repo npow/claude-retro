@@ -6,12 +6,12 @@ import pytest
 import claude_retro.config as _cr_cfg
 from claude_retro import db
 
-# agenttrace internals (db.py / config.py) are only present in the editable
+# sessionlog internals (db.py / config.py) are only present in the editable
 # install from the git repo, not in the published PyPI wheel.  Guard so tests
 # still run when only the PyPI package is installed.
 try:
-    import agenttrace.db as _at_db
-    import agenttrace.config as _at_cfg
+    import sessionlog.db as _at_db
+    import sessionlog.config as _at_cfg
 
     _HAS_AGENTTRACE_INTERNALS = True
 except ImportError:
@@ -25,7 +25,7 @@ def isolated_db(monkeypatch, tmp_path):
     """Redirect all DB access to a temp file for test isolation."""
     test_db = tmp_path / "test.sqlite"
 
-    # Set env var so both agenttrace.config and claude_retro.config use the test DB.
+    # Set env var so both sessionlog.config and claude_retro.config use the test DB.
     monkeypatch.setenv("CLAUDE_RETRO_DB", str(test_db))
 
     # Patch DB_PATH everywhere it is referenced.
@@ -33,7 +33,7 @@ def isolated_db(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DB_PATH", test_db)
 
     if _HAS_AGENTTRACE_INTERNALS:
-        # agenttrace.db._connect() looks up DB_PATH in its own namespace.
+        # sessionlog.db._connect() looks up DB_PATH in its own namespace.
         monkeypatch.setattr(_at_db, "DB_PATH", test_db)
         monkeypatch.setattr(_at_cfg, "DB_PATH", test_db)
 

@@ -1,6 +1,6 @@
-"""JSONL parsing and ingestion — delegated to agenttrace.ingest.
+"""JSONL parsing and ingestion — delegated to sessionlog.ingest.
 
-agenttrace.ingest provides:
+sessionlog.ingest provides:
 - Correct agent_progress / bash_progress parsing (parentUuid on outer record)
 - progress_entries table population
 - conn.commit() fix (writes were previously lost)
@@ -10,7 +10,7 @@ All public functions re-exported unchanged; callers in claude-retro continue
 to work without modification.
 """
 
-from agenttrace.ingest import (
+from sessionlog.ingest import (
     find_jsonl_files,
     needs_ingestion,
     mark_skip,

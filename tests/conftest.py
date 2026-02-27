@@ -3,10 +3,21 @@
 import json
 import pytest
 
-import agenttrace.db as _at_db
-import agenttrace.config as _at_cfg
 import claude_retro.config as _cr_cfg
 from claude_retro import db
+
+# agenttrace internals (db.py / config.py) are only present in the editable
+# install from the git repo, not in the published PyPI wheel.  Guard so tests
+# still run when only the PyPI package is installed.
+try:
+    import agenttrace.db as _at_db
+    import agenttrace.config as _at_cfg
+
+    _HAS_AGENTTRACE_INTERNALS = True
+except ImportError:
+    _at_db = None  # type: ignore[assignment]
+    _at_cfg = None  # type: ignore[assignment]
+    _HAS_AGENTTRACE_INTERNALS = False
 
 
 @pytest.fixture(autouse=True)
@@ -18,17 +29,19 @@ def isolated_db(monkeypatch, tmp_path):
     monkeypatch.setenv("CLAUDE_RETRO_DB", str(test_db))
 
     # Patch DB_PATH everywhere it is referenced.
-    # agenttrace.db._connect() looks up DB_PATH in agenttrace.db's own namespace,
-    # so we must patch that module-level name directly.
-    monkeypatch.setattr(_at_db, "DB_PATH", test_db)
-    monkeypatch.setattr(_at_cfg, "DB_PATH", test_db)
     monkeypatch.setattr(_cr_cfg, "DB_PATH", test_db)
     monkeypatch.setattr(db, "DB_PATH", test_db)
 
+    if _HAS_AGENTTRACE_INTERNALS:
+        # agenttrace.db._connect() looks up DB_PATH in its own namespace.
+        monkeypatch.setattr(_at_db, "DB_PATH", test_db)
+        monkeypatch.setattr(_at_cfg, "DB_PATH", test_db)
+
     # Reset the writer connection so the next get_writer() creates a fresh one
     # pointing at the test DB.
-    old_writer = _at_db._writer_conn
-    _at_db._writer_conn = None
+    old_writer = _at_db._writer_conn if _HAS_AGENTTRACE_INTERNALS else None
+    if _HAS_AGENTTRACE_INTERNALS:
+        _at_db._writer_conn = None
 
     # Reset claude_retro.db extra-schema flag so it re-runs on new connection.
     import claude_retro.db as _cr_db
@@ -36,7 +49,7 @@ def isolated_db(monkeypatch, tmp_path):
     _cr_db._extra_initialized = False
 
     # Reset thread-local reader connection
-    if hasattr(_at_db._local, "reader"):
+    if _HAS_AGENTTRACE_INTERNALS and hasattr(_at_db._local, "reader"):
         try:
             _at_db._local.reader.close()
         except Exception:
@@ -46,17 +59,18 @@ def isolated_db(monkeypatch, tmp_path):
     yield test_db
 
     # Teardown: restore original writer, close test connections
-    try:
-        test_conn = _at_db._writer_conn
-        if test_conn is not None:
-            test_conn.close()
-    except Exception:
-        pass
+    if _HAS_AGENTTRACE_INTERNALS:
+        try:
+            test_conn = _at_db._writer_conn
+            if test_conn is not None:
+                test_conn.close()
+        except Exception:
+            pass
+        _at_db._writer_conn = old_writer
 
-    _at_db._writer_conn = old_writer
     _cr_db._extra_initialized = False
 
-    if hasattr(_at_db._local, "reader"):
+    if _HAS_AGENTTRACE_INTERNALS and hasattr(_at_db._local, "reader"):
         try:
             _at_db._local.reader.close()
         except Exception:

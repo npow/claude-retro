@@ -4109,7 +4109,11 @@ document.addEventListener('keydown', (e) => {
   // j/k - Navigate sessions
   if ((e.key === 'j' || e.key === 'k') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
-    const sessions = Array.from(document.querySelectorAll('.s-card'));
+    // Only navigate visible cards (exclude cards inside hidden containers)
+    const sessions = Array.from(document.querySelectorAll('.s-card')).filter(c => {
+      const wrap = c.closest('#session-feed-wrap, #session-tree');
+      return !wrap || getComputedStyle(wrap).display !== 'none';
+    });
     if (sessions.length === 0) return;
 
     let currentIndex = sessions.findIndex(s => s.classList.contains('expanded'));

@@ -81,9 +81,6 @@ def build_session_summary(session_id: str, conn) -> tuple[str, int]:
     total_output_tokens = 0
 
     # We need to look ahead for tool results to annotate assistant turns
-    # Build list of entries with index for look-ahead
-    pending_tool_errors = []
-
     for idx, (
         entry_type,
         ts_str,
@@ -459,7 +456,7 @@ def _build_record(session_id, summary, turn_count=0):
     friction_cats = result.get("friction_categories", {})
 
     # Parse estimated cost from session summary header (~$X.XX estimated cost)
-    cost_match = re.search(r'~\$(\d+\.\d+) estimated cost', summary)
+    cost_match = re.search(r"~\$(\d+\.\d+) estimated cost", summary)
     cost_usd = float(cost_match.group(1)) if cost_match else 0.0
 
     return {
@@ -527,7 +524,9 @@ def judge_session(session_id: str, conn) -> dict:
 
 
 def judge_sessions(
-    force: bool = False, concurrency: int = CONCURRENCY, progress_callback=None,
+    force: bool = False,
+    concurrency: int = CONCURRENCY,
+    progress_callback=None,
     fill_narratives: bool = False,
 ) -> int:
     """Judge all unjudged sessions (incremental). Returns count judged.
@@ -541,8 +540,8 @@ def judge_sessions(
     """
     from .db import get_writer
 
-    conn = get_conn()       # reader for SELECT queries
-    wconn = get_writer()    # writer for INSERT/DELETE
+    conn = get_conn()  # reader for SELECT queries
+    wconn = get_writer()  # writer for INSERT/DELETE
 
     # Only judge sessions with >= 1 turn (0-turn sessions are trivial Q&A or meta-analysis)
     min_turns = 1
@@ -554,22 +553,28 @@ def judge_sessions(
         ).fetchall()
     elif fill_narratives:
         # Re-judge sessions that have a judgment but are missing narrative text
-        session_rows = conn.execute("""
+        session_rows = conn.execute(
+            """
             SELECT s.session_id, s.user_prompt_count
             FROM sessions s
             JOIN session_judgments j ON s.session_id = j.session_id
             WHERE s.turn_count >= ?
               AND (j.narrative IS NULL OR j.narrative = '')
             ORDER BY s.started_at
-        """, [min_turns]).fetchall()
+        """,
+            [min_turns],
+        ).fetchall()
     else:
-        session_rows = conn.execute("""
+        session_rows = conn.execute(
+            """
             SELECT s.session_id, s.user_prompt_count
             FROM sessions s
             LEFT JOIN session_judgments j ON s.session_id = j.session_id
             WHERE j.session_id IS NULL AND s.turn_count >= ?
             ORDER BY s.started_at
-        """, [min_turns]).fetchall()
+        """,
+            [min_turns],
+        ).fetchall()
 
     total = len(session_rows)
     if total == 0:
@@ -577,7 +582,9 @@ def judge_sessions(
             progress_callback(0, 0, 0, 0)
         # No new sessions to judge, but still regenerate synthesis if we have data
         try:
-            existing = conn.execute("SELECT COUNT(*) FROM session_judgments").fetchone()[0]
+            existing = conn.execute(
+                "SELECT COUNT(*) FROM session_judgments"
+            ).fetchone()[0]
             if existing >= 3:
                 print("  No new sessions to judge. Regenerating synthesis...")
                 generate_synthesis()
@@ -773,7 +780,6 @@ def _update_skill_nudges_from_synthesis(conn, dim_nudges: dict):
         if updated == 0:
             # Insert a new nudge if none exists
             try:
-                dim_num = int(dim_id[1:])
                 conn.execute(
                     """INSERT INTO skill_nudges (dimension, current_level, target_level, nudge_text, evidence, frequency)
                        VALUES (?, 1, 2, ?, 'LLM-generated from session patterns', 1)""",
@@ -811,8 +817,25 @@ def generate_synthesis():
     # Build session data summary for the LLM
     session_lines = []
     for r in rows:
-        sid, outcome, prod, mis, narrative, worked, failed, quote, cmd_sug, cmd_rat, summary, project, dur, turns = r
-        short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        (
+            sid,
+            outcome,
+            prod,
+            mis,
+            narrative,
+            worked,
+            failed,
+            quote,
+            cmd_sug,
+            cmd_rat,
+            summary,
+            project,
+            dur,
+            turns,
+        ) = r
+        short_project = (
+            (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        )
         line = f"- [{outcome}] {short_project}: {summary or '(no summary)'}"
         if narrative:
             line += f"\n  Narrative: {narrative[:200]}"
@@ -896,23 +919,35 @@ def generate_synthesis():
     # Archive current synthesis to history BEFORE overwriting
     existing = wconn.execute("SELECT * FROM synthesis WHERE id = 1").fetchone()
     if existing:
-        cols = [d[0] for d in wconn.execute("SELECT * FROM synthesis WHERE id = 1").description]
+        cols = [
+            d[0]
+            for d in wconn.execute("SELECT * FROM synthesis WHERE id = 1").description
+        ]
         row_dict = dict(zip(cols, existing))
-        wconn.execute("""
+        wconn.execute(
+            """
             INSERT INTO synthesis_history
             (at_a_glance, usage_narrative, top_wins, top_friction, claude_md_additions,
              fun_headline, workflow_prompts, features_to_try, session_count, productivity_avg,
              friction_counts, skill_levels, generated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, [
-            row_dict.get("at_a_glance"), row_dict.get("usage_narrative"),
-            row_dict.get("top_wins"), row_dict.get("top_friction"),
-            row_dict.get("claude_md_additions"), row_dict.get("fun_headline"),
-            row_dict.get("workflow_prompts"), row_dict.get("features_to_try"),
-            row_dict.get("session_count", 0), row_dict.get("productivity_avg", 0),
-            row_dict.get("friction_counts"), row_dict.get("skill_levels"),
-            row_dict.get("generated_at"),
-        ])
+        """,
+            [
+                row_dict.get("at_a_glance"),
+                row_dict.get("usage_narrative"),
+                row_dict.get("top_wins"),
+                row_dict.get("top_friction"),
+                row_dict.get("claude_md_additions"),
+                row_dict.get("fun_headline"),
+                row_dict.get("workflow_prompts"),
+                row_dict.get("features_to_try"),
+                row_dict.get("session_count", 0),
+                row_dict.get("productivity_avg", 0),
+                row_dict.get("friction_counts"),
+                row_dict.get("skill_levels"),
+                row_dict.get("generated_at"),
+            ],
+        )
 
     # Store in synthesis table
     wconn.execute("DELETE FROM synthesis")
@@ -964,7 +999,11 @@ def auto_apply_claude_md_suggestions() -> int:
     ).fetchone()
     if synth_row and synth_row[0]:
         try:
-            additions = json.loads(synth_row[0]) if isinstance(synth_row[0], str) else synth_row[0]
+            additions = (
+                json.loads(synth_row[0])
+                if isinstance(synth_row[0], str)
+                else synth_row[0]
+            )
             for a in additions:
                 rule = a.get("rule", "").strip()
                 if rule:
@@ -1063,7 +1102,11 @@ def _append_rules_to_claude_md(claude_md: Path, rules: list[str]) -> bool:
 
     # Extract existing rules from our managed section (if it exists)
     existing_retro_rules = []
-    pattern = re.escape(_RETRO_SECTION_MARKER) + r"\n(.*?)\n" + re.escape(_RETRO_SECTION_MARKER)
+    pattern = (
+        re.escape(_RETRO_SECTION_MARKER)
+        + r"\n(.*?)\n"
+        + re.escape(_RETRO_SECTION_MARKER)
+    )
     match = re.search(pattern, existing_content, re.DOTALL)
     if match:
         existing_retro_rules = [
@@ -1073,7 +1116,9 @@ def _append_rules_to_claude_md(claude_md: Path, rules: list[str]) -> bool:
     # Content outside our section (for dedup against manually-written rules)
     content_outside_section = existing_content
     if match:
-        content_outside_section = existing_content[:match.start()] + existing_content[match.end():]
+        content_outside_section = (
+            existing_content[: match.start()] + existing_content[match.end() :]
+        )
     outside_lower = content_outside_section.lower()
 
     # Merge: start with existing retro rules, add new ones that aren't duplicates
@@ -1097,12 +1142,23 @@ def _append_rules_to_claude_md(claude_md: Path, rules: list[str]) -> bool:
 
     if _RETRO_SECTION_MARKER in existing_content:
         # Replace existing section with merged content
-        replacement = f"{_RETRO_SECTION_MARKER}\n{section_content}\n{_RETRO_SECTION_MARKER}"
+        replacement = (
+            f"{_RETRO_SECTION_MARKER}\n{section_content}\n{_RETRO_SECTION_MARKER}"
+        )
         new_content = re.sub(pattern, replacement, existing_content, flags=re.DOTALL)
     else:
         # Append new section
-        separator = "\n\n" if existing_content and not existing_content.endswith("\n\n") else "\n" if existing_content and not existing_content.endswith("\n") else ""
-        new_content = existing_content + f"{separator}\n{_RETRO_SECTION_HEADER}\n{_RETRO_SECTION_MARKER}\n{section_content}\n{_RETRO_SECTION_MARKER}\n"
+        separator = (
+            "\n\n"
+            if existing_content and not existing_content.endswith("\n\n")
+            else "\n"
+            if existing_content and not existing_content.endswith("\n")
+            else ""
+        )
+        new_content = (
+            existing_content
+            + f"{separator}\n{_RETRO_SECTION_HEADER}\n{_RETRO_SECTION_MARKER}\n{section_content}\n{_RETRO_SECTION_MARKER}\n"
+        )
 
     claude_md.write_text(new_content)
     print(f"    Updated {claude_md} (+{new_count} new, {len(merged)} total rules)")
@@ -1142,13 +1198,16 @@ def rewrite_prompt(session_id: str, conn) -> dict:
     """Rewrite the opening prompt for a session to reduce friction. Caches result."""
     from .db import get_writer
 
-    row = conn.execute("""
+    row = conn.execute(
+        """
         SELECT j.what_failed, j.misalignments, j.prompt_summary,
                s.first_prompt, j.rewrite_memo
         FROM session_judgments j
         JOIN sessions s ON j.session_id = s.session_id
         WHERE j.session_id = ?
-    """, [session_id]).fetchone()
+    """,
+        [session_id],
+    ).fetchone()
 
     if not row:
         return {"error": "Session not found or not judged"}
@@ -1172,19 +1231,24 @@ def rewrite_prompt(session_id: str, conn) -> dict:
         try:
             items = json.loads(raw) if isinstance(raw, str) else (raw or [])
             for item in items:
-                desc = (item.get("description", "") if isinstance(item, dict) else str(item))[:80]
+                desc = (
+                    item.get("description", "") if isinstance(item, dict) else str(item)
+                )[:80]
                 if desc:
                     desc_counts[desc] = desc_counts.get(desc, 0) + 1
         except Exception:
             pass
-    top_recurring = "; ".join(
-        d for d, _ in sorted(desc_counts.items(), key=lambda x: -x[1])[:3]
-    ) or "none detected"
+    top_recurring = (
+        "; ".join(d for d, _ in sorted(desc_counts.items(), key=lambda x: -x[1])[:3])
+        or "none detected"
+    )
 
     misalignments_text = "(none)"
     if mis_json:
         try:
-            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            items = (
+                json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            )
             descs = [
                 (item.get("description", "") if isinstance(item, dict) else str(item))
                 for item in items[:3]
@@ -1254,16 +1318,21 @@ def predict_friction(prompt_text: str, conn) -> dict:
         try:
             items = json.loads(raw) if isinstance(raw, str) else (raw or [])
             for item in items:
-                desc = (item.get("description", "") if isinstance(item, dict) else str(item))[:80]
+                desc = (
+                    item.get("description", "") if isinstance(item, dict) else str(item)
+                )[:80]
                 if desc:
                     desc_counts[desc] = desc_counts.get(desc, 0) + 1
         except Exception:
             pass
 
-    top_patterns_text = "\n".join(
-        f"- ({cnt}x) {desc}" for desc, cnt in
-        sorted(desc_counts.items(), key=lambda x: -x[1])[:8]
-    ) or "No patterns detected yet"
+    top_patterns_text = (
+        "\n".join(
+            f"- ({cnt}x) {desc}"
+            for desc, cnt in sorted(desc_counts.items(), key=lambda x: -x[1])[:8]
+        )
+        or "No patterns detected yet"
+    )
 
     stats_row = conn.execute("""
         SELECT COUNT(*), AVG(misalignment_count), AVG(productivity_ratio)
@@ -1323,13 +1392,16 @@ def generate_handoff(session_id: str, conn) -> dict:
     """Generate a handoff memo for a session. Caches result in handoff_memo column."""
     from .db import get_writer
 
-    row = conn.execute("""
+    row = conn.execute(
+        """
         SELECT j.narrative, j.what_worked, j.what_failed, j.outcome,
                j.prompt_summary, s.project_name, j.handoff_memo
         FROM session_judgments j
         JOIN sessions s ON j.session_id = s.session_id
         WHERE j.session_id = ?
-    """, [session_id]).fetchone()
+    """,
+        [session_id],
+    ).fetchone()
 
     if not row:
         return {"error": "Session not found or not judged"}
@@ -1342,7 +1414,9 @@ def generate_handoff(session_id: str, conn) -> dict:
         except (json.JSONDecodeError, ValueError):
             pass
 
-    short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+    short_project = (
+        (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+    )
 
     prompt = _HANDOFF_TEMPLATE.format(
         project=short_project,
@@ -1408,7 +1482,11 @@ def audit_claudemd(conn) -> dict:
     rules = []
     if synth_row and synth_row[0]:
         try:
-            additions = json.loads(synth_row[0]) if isinstance(synth_row[0], str) else (synth_row[0] or [])
+            additions = (
+                json.loads(synth_row[0])
+                if isinstance(synth_row[0], str)
+                else (synth_row[0] or [])
+            )
             for a in additions:
                 rule = a.get("rule", "").strip()
                 if rule:
@@ -1442,7 +1520,9 @@ def audit_claudemd(conn) -> dict:
         try:
             items = json.loads(raw) if isinstance(raw, str) else (raw or [])
             for item in items:
-                desc = item.get("description", "") if isinstance(item, dict) else str(item)
+                desc = (
+                    item.get("description", "") if isinstance(item, dict) else str(item)
+                )
                 if desc:
                     mis_descs.append(f"- {desc[:120]}")
         except Exception:
@@ -1461,7 +1541,7 @@ def audit_claudemd(conn) -> dict:
     )
 
     prompt = _CLAUDEMD_AUDIT_TEMPLATE.format(
-        rules="\n".join(f"{i+1}. {r}" for i, r in enumerate(rules[:20])),
+        rules="\n".join(f"{i + 1}. {r}" for i, r in enumerate(rules[:20])),
         misalignments="\n".join(mis_descs[:40]) or "(no recent misalignments)",
         friction_rate=friction_rate,
     )

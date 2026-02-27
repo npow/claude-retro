@@ -1,7 +1,5 @@
 """Tests for skill tree assessment."""
 
-from datetime import datetime, timedelta
-
 from claude_retro.sessions import build_sessions, build_tool_usage
 from claude_retro.features import extract_features
 from claude_retro.skills import (
@@ -97,9 +95,7 @@ class TestPlanning:
         assert level == 1
 
     def test_numbered_steps(self):
-        data = _make_data(
-            user_texts=["Step 1: create the schema\nStep 2: add the API"]
-        )
+        data = _make_data(user_texts=["Step 1: create the schema\nStep 2: add the API"])
         level, opp = _detect_planning(data)
         assert level == 2
 
@@ -262,7 +258,9 @@ class TestEdgeCases:
         """'Version 1.2' should NOT trigger numbered-steps planning."""
         data = _make_data(user_texts=["Fix the bug in version 1.2", "Ship it"])
         level, opp = _detect_planning(data)
-        assert level == 1, f"Version number '1.' should not trigger planning L2, got L{level}"
+        assert level == 1, (
+            f"Version number '1.' should not trigger planning L2, got L{level}"
+        )
 
     def test_planning_line_number_not_detected(self):
         """'line 1.' should NOT trigger numbered-steps planning."""
@@ -287,12 +285,21 @@ class TestEdgeCases:
             user_texts=["Create the directory structure", "Now implement auth"],
         )
         level, opp = _detect_verification(data)
-        assert level < 3, f"Non-test Bash before Edit should not trigger L3, got L{level}"
+        assert level < 3, (
+            f"Non-test Bash before Edit should not trigger L3, got L{level}"
+        )
 
     def test_tool_leverage_standard_tools_not_mcp(self):
         """Standard Claude tools like EnterPlanMode should NOT count as MCP."""
         data = _make_data(
-            tool_names=["Edit", "Read", "Bash", "EnterPlanMode", "ExitPlanMode", "Skill"],
+            tool_names=[
+                "Edit",
+                "Read",
+                "Bash",
+                "EnterPlanMode",
+                "ExitPlanMode",
+                "Skill",
+            ],
             features={"unique_tools_used": 6, "bash_ratio": 0.1, "task_ratio": 0.0},
         )
         level, opp = _detect_tool_leverage(data)
@@ -391,9 +398,7 @@ class TestEndToEnd:
         assess_skills()
 
         conn = seed_entries
-        profile = conn.execute(
-            "SELECT * FROM skill_profile WHERE id = 1"
-        ).fetchone()
+        profile = conn.execute("SELECT * FROM skill_profile WHERE id = 1").fetchone()
         assert profile is not None
 
     def test_idempotent(self, seed_entries):

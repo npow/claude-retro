@@ -39,7 +39,9 @@ __all__ = [
 
 def _migrate_add_columns(conn: sqlite3.Connection, table: str, columns: list):
     """Add columns to table if they don't exist (safe migration)."""
-    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    existing = {
+        row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    }
     for col_name, col_type in columns:
         if col_name not in existing:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
@@ -48,14 +50,18 @@ def _migrate_add_columns(conn: sqlite3.Connection, table: str, columns: list):
 def _init_extra_schema(conn: sqlite3.Connection):
     """Apply claude-retro-specific schema extensions on top of the agenttrace base."""
     # synthesis has extra columns in claude-retro not present in agenttrace
-    _migrate_add_columns(conn, "synthesis", [
-        ("workflow_prompts", "TEXT"),
-        ("features_to_try", "TEXT"),
-        ("session_count", "INTEGER DEFAULT 0"),
-        ("productivity_avg", "REAL DEFAULT 0"),
-        ("friction_counts", "TEXT"),  # JSON: {type: count}
-        ("skill_levels", "TEXT"),     # JSON: {dim: level}
-    ])
+    _migrate_add_columns(
+        conn,
+        "synthesis",
+        [
+            ("workflow_prompts", "TEXT"),
+            ("features_to_try", "TEXT"),
+            ("session_count", "INTEGER DEFAULT 0"),
+            ("productivity_avg", "REAL DEFAULT 0"),
+            ("friction_counts", "TEXT"),  # JSON: {type: count}
+            ("skill_levels", "TEXT"),  # JSON: {dim: level}
+        ],
+    )
     # synthesis_history — one row per judge run (previous values before overwrite)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS synthesis_history (
@@ -76,17 +82,25 @@ def _init_extra_schema(conn: sqlite3.Connection):
         )
     """)
     # session_judgments has extra columns in claude-retro
-    _migrate_add_columns(conn, "session_judgments", [
-        ("friction_categories", "TEXT"),
-        ("estimated_cost_usd", "REAL"),
-        ("handoff_memo", "TEXT"),
-        ("rewrite_memo", "TEXT"),
-    ])
+    _migrate_add_columns(
+        conn,
+        "session_judgments",
+        [
+            ("friction_categories", "TEXT"),
+            ("estimated_cost_usd", "REAL"),
+            ("handoff_memo", "TEXT"),
+            ("rewrite_memo", "TEXT"),
+        ],
+    )
     # session_tool_usage gains timing columns
-    _migrate_add_columns(conn, "session_tool_usage", [
-        ("total_duration_ms", "INTEGER DEFAULT 0"),
-        ("avg_duration_ms", "REAL DEFAULT 0"),
-    ])
+    _migrate_add_columns(
+        conn,
+        "session_tool_usage",
+        [
+            ("total_duration_ms", "INTEGER DEFAULT 0"),
+            ("avg_duration_ms", "REAL DEFAULT 0"),
+        ],
+    )
     conn.commit()
 
 

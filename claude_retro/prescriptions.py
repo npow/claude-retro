@@ -2,7 +2,7 @@
 
 import json
 
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def generate_prescriptions():
@@ -232,7 +232,9 @@ def _project_flags(conn) -> int:
             advice.append("break tasks into smaller, well-scoped prompts")
         if mis is not None and avg_mis is not None and mis > avg_mis * 1.5 and mis >= 2:
             problems.append(f"{mis:.1f} misalignments/session vs {avg_mis:.1f} avg")
-            advice.append("add explicit constraints and expected behavior to your prompts")
+            advice.append(
+                "add explicit constraints and expected behavior to your prompts"
+            )
         if p_avg_errors > avg_errors * 1.5 and total_errors >= 3:
             problems.append(
                 f"{total_errors:.0f} tool errors ({p_avg_errors:.1f}/session vs {avg_errors:.1f} avg)"

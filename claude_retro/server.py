@@ -33,157 +33,387 @@ def set_worker(worker):
 
 # Priority-ordered patterns; first match wins, minimising "Other"
 _FRICTION_PATTERNS = [
-    ("Ignored User Instruction", [
-        "contrary to", "contrary to user", "despite user",
-        "despite being told", "despite the user",
-        "user explicitly", "user had explicitly", "user said not to",
-        "user said they", "user asked to remove", "user had told",
-        "user confirmed", "user clarified", "user preferred",
-        "user specified", "user corrected", "user redirected",
-        "user interrupted", "user had to point out",
-        "when user told", "when user said", "after user said",
-        "after the user", "user wanted", "user requested",
-        "continuing after", "still working on",
-        "questioning whether", "as user requested", "as directed",
-        "delegated", "instead of doing it himself",
-        "suggested user take action", "asked user to",
-        "user had already clarified", "user had clarified",
-        "user expected", "user's expectation",
-        "user stated:", "user said:", "user said ", "user pushed back",
-        "user had to", "were supposed to be", "implementing something different",
-    ]),
-    ("Repeated Failure", [
-        "consecutive turns", "consecutive failed", "multiple consecutive",
-        "consecutive", "cycle of failed", "without changing approach",
-        "multiple fail", "multiple attempt",
-        "repeated attempt", "required retry", "requiring recovery",
-        "tried the same", "same approach again",
-        "still failing after", "still not working after",
-        "across multiple turns", "multiple additional iteration",
-        "required multiple", "for 26 turns", "still insisted",
-        "circular debugging", "repeated error", "repeated the same",
-        "going in circles", "kept trying", "spent 52 turns", "spent 100+",
-    ]),
-    ("Misunderstood Request", [
-        "misunderstood", "misinterpreted", "confusion about",
-        "confused about", "confused the", "not understanding",
-        "not understand", "confused why", "scope mismatch",
-        "misunderstanding that", "misunderstand",
-        "expectation mismatch", "mismatch; original",
-        "user's actual concern", "user actually wanted",
-        "user's actual need", "actual need was",
-        "rather than brainstorming", "conflated",
-        "interpreted this as", "user pivoted",
-    ]),
-    ("Jumped Ahead Without Clarifying", [
-        "without asking clarifying", "without first asking",
-        "without clarifying", "without first understanding",
-        "should have asked", "should have clarified",
-        "should have requested", "should have first",
-        "should have researched", "should have figured",
-        "before asking", "before clarifying",
-        "before understanding the core", "before understanding",
-        "jumped directly into", "jumped directly to",
-        "jumped to", "dove into",
-        "without establishing", "without validating",
-        "without first validating", "without explaining",
-        "without explaining approach",
-        "proceeded without", "proceeded before",
-        "without reading", "without understanding",
-        "without requesting", "rather than first",
-        "launched into", "without profiling",
-        "before root caus", "before testing",
-        "without first explaining", "without explicitly",
-        "should have used", "before applying",
-        "rather than examining", "should have prompted",
-        "should have been", "without clear justification",
-    ]),
-    ("Wrong Approach", [
-        "wrong approach", "wrong method", "wrong strategy", "wrong testing",
-        "wrong command", "wrong tool", "wrong direction", "wrong installation",
-        "wrong import", "wrong source", "wrong location", "wrong path",
-        "attempted wrong", "proposed mock", "without properly root caus",
-        "without root caus", "incorrect approach", "instead of", "wrong ",
-        "entered plan mode", "pursuing strategy", "unnecessary complex",
-        "slower approach", "when direct", "requires ci modification",
-        "to symlink", "symlink approach", "over-engineer",
-        "veered into", "veered away", "scope creep",
-        "too cautious", "too conservative", "hesitant to proceed",
-        "inappropriate for", "is inappropriate",
-        "beyond scope", "ci modification", "architectural mismatch",
-        "diverged to", "led to regressions",
-        "rather than integrated", "unexpected line",
-        "rather than scoped", "rather than examining actual",
-    ]),
-    ("Premature Completion", [
-        "claimed thorough", "claimed everything works",
-        "claimed local testing", "claimed no issues",
-        "marked all tasks done",
-        "without actually testing", "without actually running",
-        "without end-to-end", "without running tests",
-        "false impression of", "comprehensive enough",
-        "claimed complete", "without verifying in",
-        "without fully testing",
-    ]),
-    ("Incomplete Work", [
-        "never delivered", "never synthesized", "never answered",
-        "left placeholder", "left todos", "still todos",
-        "abruptly with no", "ended abruptly",
-        "without completing", "without delivering",
-        "session ended abruptly", "without any response",
-        "left incomplete", "left unimplemented",
-        "left outstanding", "never completed",
-        "no output after", "appeared blocked", "no visible progress",
-        "produced no output", "final turns diverged",
-    ]),
-    ("Missed Issues", [
-        "didn't", "did not", "failed to", "forgot to", "overlooked",
-        "without identifying", "without checking", "without verifying",
-        "not check", "not identify", "not recogni", "incomplete",
-        "missed the", "missed that", "missed a",
-        "not converting", "not installing", "not putting", "not finding",
-        "not debugging", "unable to", "not able to",
-        "not looking at", "needed user to provide",
-        "not tracking", "not using correct",
-        "weren't caught", "not caught",
-        "not proactively", "hadn't anticipated",
-        "not comprehensive", "without running",
-        "wasn't caught", "without proactively",
-        "lacked context", "no automated",
-    ]),
-    ("Buggy Code", [
-        "incorrect", "incorrectly", "duplicate", "would incorrectly",
-        "logic error", "wrong output", "wrong result", "but this was",
-        "causing attri", "causing type", "causing test", "causing import",
-        "hardcoded", "hard-coded", "committed unwanted", "commented out critical",
-        "too implementation-dependent", "deployed without adequate",
-        "caused segmentation", "caused typeerror", "caused crash",
-        "still inconsistent", "functionality broke",
-        "hardcoding", "user caught this", "was empty",
-    ]),
-    ("Wrong Assumption", [
-        "assumed ", "incorrect assumption", "assumption about",
-        "stated that", "claimed that", "confidently stated",
-        "asserted that", "second-guess", "misunderstanding that",
-        "claimed no", "false impression",
-        "speculated", "assuming it was", "user questioned whether",
-    ]),
-    ("User Rejected Action", [
-        "user rejected", "user cancelled", "user denied",
-        "refused", "permission denied",
-        "rejected by user as",
-    ]),
-    ("Tool/Bash Error", [
-        "bash error", "bash command error", "tool error", "command error",
-        "read tool error", "edit error",
-        "git operation failed", "commit commands failed", "git commit failed",
-        "hit minio", "connection refused", "timeout",
-        "webfetch", "fetch error", "requiring vpn", "requiring authentication",
-        "needed to be killed", "errored out",
-        "tool failed", "connection issues", "mcp had",
-        "failed with error", "which errored",
-        "execution errors", "bash access to",
-    ]),
+    (
+        "Ignored User Instruction",
+        [
+            "contrary to",
+            "contrary to user",
+            "despite user",
+            "despite being told",
+            "despite the user",
+            "user explicitly",
+            "user had explicitly",
+            "user said not to",
+            "user said they",
+            "user asked to remove",
+            "user had told",
+            "user confirmed",
+            "user clarified",
+            "user preferred",
+            "user specified",
+            "user corrected",
+            "user redirected",
+            "user interrupted",
+            "user had to point out",
+            "when user told",
+            "when user said",
+            "after user said",
+            "after the user",
+            "user wanted",
+            "user requested",
+            "continuing after",
+            "still working on",
+            "questioning whether",
+            "as user requested",
+            "as directed",
+            "delegated",
+            "instead of doing it himself",
+            "suggested user take action",
+            "asked user to",
+            "user had already clarified",
+            "user had clarified",
+            "user expected",
+            "user's expectation",
+            "user stated:",
+            "user said:",
+            "user said ",
+            "user pushed back",
+            "user had to",
+            "were supposed to be",
+            "implementing something different",
+        ],
+    ),
+    (
+        "Repeated Failure",
+        [
+            "consecutive turns",
+            "consecutive failed",
+            "multiple consecutive",
+            "consecutive",
+            "cycle of failed",
+            "without changing approach",
+            "multiple fail",
+            "multiple attempt",
+            "repeated attempt",
+            "required retry",
+            "requiring recovery",
+            "tried the same",
+            "same approach again",
+            "still failing after",
+            "still not working after",
+            "across multiple turns",
+            "multiple additional iteration",
+            "required multiple",
+            "for 26 turns",
+            "still insisted",
+            "circular debugging",
+            "repeated error",
+            "repeated the same",
+            "going in circles",
+            "kept trying",
+            "spent 52 turns",
+            "spent 100+",
+        ],
+    ),
+    (
+        "Misunderstood Request",
+        [
+            "misunderstood",
+            "misinterpreted",
+            "confusion about",
+            "confused about",
+            "confused the",
+            "not understanding",
+            "not understand",
+            "confused why",
+            "scope mismatch",
+            "misunderstanding that",
+            "misunderstand",
+            "expectation mismatch",
+            "mismatch; original",
+            "user's actual concern",
+            "user actually wanted",
+            "user's actual need",
+            "actual need was",
+            "rather than brainstorming",
+            "conflated",
+            "interpreted this as",
+            "user pivoted",
+        ],
+    ),
+    (
+        "Jumped Ahead Without Clarifying",
+        [
+            "without asking clarifying",
+            "without first asking",
+            "without clarifying",
+            "without first understanding",
+            "should have asked",
+            "should have clarified",
+            "should have requested",
+            "should have first",
+            "should have researched",
+            "should have figured",
+            "before asking",
+            "before clarifying",
+            "before understanding the core",
+            "before understanding",
+            "jumped directly into",
+            "jumped directly to",
+            "jumped to",
+            "dove into",
+            "without establishing",
+            "without validating",
+            "without first validating",
+            "without explaining",
+            "without explaining approach",
+            "proceeded without",
+            "proceeded before",
+            "without reading",
+            "without understanding",
+            "without requesting",
+            "rather than first",
+            "launched into",
+            "without profiling",
+            "before root caus",
+            "before testing",
+            "without first explaining",
+            "without explicitly",
+            "should have used",
+            "before applying",
+            "rather than examining",
+            "should have prompted",
+            "should have been",
+            "without clear justification",
+        ],
+    ),
+    (
+        "Wrong Approach",
+        [
+            "wrong approach",
+            "wrong method",
+            "wrong strategy",
+            "wrong testing",
+            "wrong command",
+            "wrong tool",
+            "wrong direction",
+            "wrong installation",
+            "wrong import",
+            "wrong source",
+            "wrong location",
+            "wrong path",
+            "attempted wrong",
+            "proposed mock",
+            "without properly root caus",
+            "without root caus",
+            "incorrect approach",
+            "instead of",
+            "wrong ",
+            "entered plan mode",
+            "pursuing strategy",
+            "unnecessary complex",
+            "slower approach",
+            "when direct",
+            "requires ci modification",
+            "to symlink",
+            "symlink approach",
+            "over-engineer",
+            "veered into",
+            "veered away",
+            "scope creep",
+            "too cautious",
+            "too conservative",
+            "hesitant to proceed",
+            "inappropriate for",
+            "is inappropriate",
+            "beyond scope",
+            "ci modification",
+            "architectural mismatch",
+            "diverged to",
+            "led to regressions",
+            "rather than integrated",
+            "unexpected line",
+            "rather than scoped",
+            "rather than examining actual",
+        ],
+    ),
+    (
+        "Premature Completion",
+        [
+            "claimed thorough",
+            "claimed everything works",
+            "claimed local testing",
+            "claimed no issues",
+            "marked all tasks done",
+            "without actually testing",
+            "without actually running",
+            "without end-to-end",
+            "without running tests",
+            "false impression of",
+            "comprehensive enough",
+            "claimed complete",
+            "without verifying in",
+            "without fully testing",
+        ],
+    ),
+    (
+        "Incomplete Work",
+        [
+            "never delivered",
+            "never synthesized",
+            "never answered",
+            "left placeholder",
+            "left todos",
+            "still todos",
+            "abruptly with no",
+            "ended abruptly",
+            "without completing",
+            "without delivering",
+            "session ended abruptly",
+            "without any response",
+            "left incomplete",
+            "left unimplemented",
+            "left outstanding",
+            "never completed",
+            "no output after",
+            "appeared blocked",
+            "no visible progress",
+            "produced no output",
+            "final turns diverged",
+        ],
+    ),
+    (
+        "Missed Issues",
+        [
+            "didn't",
+            "did not",
+            "failed to",
+            "forgot to",
+            "overlooked",
+            "without identifying",
+            "without checking",
+            "without verifying",
+            "not check",
+            "not identify",
+            "not recogni",
+            "incomplete",
+            "missed the",
+            "missed that",
+            "missed a",
+            "not converting",
+            "not installing",
+            "not putting",
+            "not finding",
+            "not debugging",
+            "unable to",
+            "not able to",
+            "not looking at",
+            "needed user to provide",
+            "not tracking",
+            "not using correct",
+            "weren't caught",
+            "not caught",
+            "not proactively",
+            "hadn't anticipated",
+            "not comprehensive",
+            "without running",
+            "wasn't caught",
+            "without proactively",
+            "lacked context",
+            "no automated",
+        ],
+    ),
+    (
+        "Buggy Code",
+        [
+            "incorrect",
+            "incorrectly",
+            "duplicate",
+            "would incorrectly",
+            "logic error",
+            "wrong output",
+            "wrong result",
+            "but this was",
+            "causing attri",
+            "causing type",
+            "causing test",
+            "causing import",
+            "hardcoded",
+            "hard-coded",
+            "committed unwanted",
+            "commented out critical",
+            "too implementation-dependent",
+            "deployed without adequate",
+            "caused segmentation",
+            "caused typeerror",
+            "caused crash",
+            "still inconsistent",
+            "functionality broke",
+            "hardcoding",
+            "user caught this",
+            "was empty",
+        ],
+    ),
+    (
+        "Wrong Assumption",
+        [
+            "assumed ",
+            "incorrect assumption",
+            "assumption about",
+            "stated that",
+            "claimed that",
+            "confidently stated",
+            "asserted that",
+            "second-guess",
+            "misunderstanding that",
+            "claimed no",
+            "false impression",
+            "speculated",
+            "assuming it was",
+            "user questioned whether",
+        ],
+    ),
+    (
+        "User Rejected Action",
+        [
+            "user rejected",
+            "user cancelled",
+            "user denied",
+            "refused",
+            "permission denied",
+            "rejected by user as",
+        ],
+    ),
+    (
+        "Tool/Bash Error",
+        [
+            "bash error",
+            "bash command error",
+            "tool error",
+            "command error",
+            "read tool error",
+            "edit error",
+            "git operation failed",
+            "commit commands failed",
+            "git commit failed",
+            "hit minio",
+            "connection refused",
+            "timeout",
+            "webfetch",
+            "fetch error",
+            "requiring vpn",
+            "requiring authentication",
+            "needed to be killed",
+            "errored out",
+            "tool failed",
+            "connection issues",
+            "mcp had",
+            "failed with error",
+            "which errored",
+            "execution errors",
+            "bash access to",
+        ],
+    ),
 ]
 
 
@@ -313,7 +543,9 @@ def api_overview():
             "msgs_per_session_median": median_msgs,
             "msgs_per_session_p90": p90_msgs,
             "top_project": top_proj[0] if top_proj else None,
-            "top_project_pct": round(top_proj[1] / total_sessions, 2) if top_proj and total_sessions else 0,
+            "top_project_pct": round(top_proj[1] / total_sessions, 2)
+            if top_proj and total_sessions
+            else 0,
             "trajectory_distribution": {t: c for t, c in trajectory_dist},
             "baselines": [_row_to_dict(b, baseline_cols) for b in baselines],
             "total_tool_calls": int(stats[9] or 0),
@@ -357,7 +589,10 @@ def api_sessions():
         "DESC" if len(sort_parts) < 2 or sort_parts[1].upper() == "DESC" else "ASC"
     )
 
-    conditions = ["s.turn_count >= 1", "s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'"]
+    conditions = [
+        "s.turn_count >= 1",
+        "s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%'",
+    ]
     params = []
 
     if project:
@@ -475,8 +710,11 @@ def api_session_detail(session_id):
         "features": _row_to_dict(features, feature_cols) if features else {},
         "tools": [
             {
-                "tool_name": t[0], "use_count": t[1], "error_count": t[2],
-                "total_duration_ms": t[3], "avg_duration_ms": round(t[4]) if t[4] else 0,
+                "tool_name": t[0],
+                "use_count": t[1],
+                "error_count": t[2],
+                "total_duration_ms": t[3],
+                "avg_duration_ms": round(t[4]) if t[4] else 0,
             }
             for t in tools
         ],
@@ -602,7 +840,7 @@ def api_session_rich_timeline(session_id):
     if not jsonl_path.exists():
         return jsonify({"error": "JSONL not found", "timeline": []}), 404
 
-    MAX_TEXT = 400    # assistant text / tool inputs
+    MAX_TEXT = 400  # assistant text / tool inputs
     MAX_RESULT = 100_000  # tool results — send full content, UI handles collapse
     turns = []
 
@@ -649,11 +887,13 @@ def api_session_rich_timeline(session_id):
                     elif btype == "tool_use":
                         inp = block.get("input", {})
                         inp_str = json.dumps(inp, ensure_ascii=False)
-                        turn["tools"].append({
-                            "name": block.get("name", ""),
-                            "id": block.get("id", ""),
-                            "input_preview": inp_str[:MAX_TEXT],
-                        })
+                        turn["tools"].append(
+                            {
+                                "name": block.get("name", ""),
+                                "id": block.get("id", ""),
+                                "input_preview": inp_str[:MAX_TEXT],
+                            }
+                        )
                     elif btype == "tool_result":
                         turn["is_tool_result"] = True
                         turn["is_error"] = bool(block.get("is_error", False))
@@ -761,7 +1001,8 @@ def api_search():
             params.append(project)
         params.append(limit)
 
-        rows = conn.execute(f"""
+        rows = conn.execute(
+            f"""
             SELECT
                 messages_fts.session_id,
                 messages_fts.entry_type,
@@ -776,7 +1017,9 @@ def api_search():
               {project_filter}
             ORDER BY rank
             LIMIT ?
-        """, params).fetchall()
+        """,
+            params,
+        ).fetchall()
     except Exception:
         # FTS query failed — fall back to LIKE search
         like_q = f"%{q}%"
@@ -787,7 +1030,8 @@ def api_search():
             params.append(project)
         params.append(limit)
 
-        rows = conn.execute(f"""
+        rows = conn.execute(
+            f"""
             SELECT
                 r.session_id,
                 r.entry_type,
@@ -802,25 +1046,28 @@ def api_search():
               {project_filter}
             ORDER BY r.timestamp_utc DESC
             LIMIT ?
-        """, params).fetchall()
+        """,
+            params,
+        ).fetchall()
 
     results = []
-    seen_sessions = set()
     for row in rows:
         sid = row[0]
         # Deduplicate by session (show max 2 results per session)
         count = sum(1 for r in results if r["session_id"] == sid)
         if count >= 2:
             continue
-        results.append({
-            "session_id": sid,
-            "entry_type": row[1],
-            "project": row[2],
-            "first_prompt": (row[3] or "")[:80],
-            "started_at": _serialize(row[4]),
-            "snippet": row[5],
-            "timestamp": _serialize(row[6]),
-        })
+        results.append(
+            {
+                "session_id": sid,
+                "entry_type": row[1],
+                "project": row[2],
+                "first_prompt": (row[3] or "")[:80],
+                "started_at": _serialize(row[4]),
+                "snippet": row[5],
+                "timestamp": _serialize(row[6]),
+            }
+        )
 
     return jsonify({"results": results, "query": q})
 
@@ -979,7 +1226,9 @@ def api_fill_narratives():
     if _worker is None:
         return jsonify({"error": "No background worker available"}), 500
     if _worker.is_busy:
-        return jsonify({"ok": False, "message": "Worker is busy — try again later"}), 409
+        return jsonify(
+            {"ok": False, "message": "Worker is busy — try again later"}
+        ), 409
     conn = get_conn()
     missing = conn.execute("""
         SELECT COUNT(*) FROM session_judgments j
@@ -987,7 +1236,9 @@ def api_fill_narratives():
         WHERE (j.narrative IS NULL OR j.narrative = '') AND s.turn_count >= 1
     """).fetchone()[0]
     if missing == 0:
-        return jsonify({"ok": True, "message": "All sessions already have narratives", "count": 0})
+        return jsonify(
+            {"ok": True, "message": "All sessions already have narratives", "count": 0}
+        )
     body = request.get_json(silent=True) or {}
     concurrency = max(1, min(32, int(body.get("concurrency", 12))))
     _worker.request_fill_narratives(concurrency=concurrency)
@@ -1475,32 +1726,40 @@ def api_skill_dimensions_detail():
             label = f"L{lv}"
             if opp > lv:
                 label += f" (could be L{opp})"
-            short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
-            example_sessions.append({
-                "session_id": sid,
-                "level": lv,
-                "opportunity": opp,
-                "label": label,
-                "first_prompt": (prompt or "")[:80],
-                "started_at": _serialize(started),
-                "duration": dur,
-                "project": short_project,
-                "outcome": outcome,
-                "productivity": prod,
-            })
+            short_project = (
+                (project or "")
+                .replace("-Users-npow-code-", "")
+                .replace("-Users-npow-", "")
+            )
+            example_sessions.append(
+                {
+                    "session_id": sid,
+                    "level": lv,
+                    "opportunity": opp,
+                    "label": label,
+                    "first_prompt": (prompt or "")[:80],
+                    "started_at": _serialize(started),
+                    "duration": dur,
+                    "project": short_project,
+                    "outcome": outcome,
+                    "productivity": prod,
+                }
+            )
 
-        results.append({
-            "id": dim_id,
-            "name": d["name"],
-            "short": d["short"],
-            "color": d["color"],
-            "score": round(score, 1),
-            "level": level,
-            "is_gap": is_gap,
-            "next_level": target,
-            "nudge": nudge,
-            "examples": example_sessions,
-        })
+        results.append(
+            {
+                "id": dim_id,
+                "name": d["name"],
+                "short": d["short"],
+                "color": d["color"],
+                "score": round(score, 1),
+                "level": level,
+                "is_gap": is_gap,
+                "next_level": target,
+                "nudge": nudge,
+                "examples": example_sessions,
+            }
+        )
 
     return jsonify({"dimensions": results})
 
@@ -1513,12 +1772,20 @@ def api_synthesis():
     if not row:
         return jsonify({"synthesis": None})
 
-    cols = [d[0] for d in conn.execute("SELECT * FROM synthesis WHERE id = 1").description]
+    cols = [
+        d[0] for d in conn.execute("SELECT * FROM synthesis WHERE id = 1").description
+    ]
     result = _row_to_dict(row, cols)
 
     # Parse JSON fields
-    for field in ("at_a_glance", "top_wins", "top_friction", "claude_md_additions",
-                  "workflow_prompts", "features_to_try"):
+    for field in (
+        "at_a_glance",
+        "top_wins",
+        "top_friction",
+        "claude_md_additions",
+        "workflow_prompts",
+        "features_to_try",
+    ):
         if result.get(field) and isinstance(result[field], str):
             try:
                 result[field] = json.loads(result[field])
@@ -1565,7 +1832,7 @@ def api_synthesis_delta():
         except Exception:
             pass
 
-    cur_friction_row = conn.execute("""
+    conn.execute("""
         SELECT COUNT(*), AVG(misalignment_count)
         FROM session_judgments j JOIN sessions s ON j.session_id = s.session_id
         WHERE s.turn_count >= 1
@@ -1576,7 +1843,9 @@ def api_synthesis_delta():
     mis_delta = cur_mis - (prev_friction.get("avg_per_session") or cur_mis)
 
     # Skill level changes
-    skill_rows = conn.execute("SELECT dimension_id, current_level FROM skill_profile").fetchall()
+    skill_rows = conn.execute(
+        "SELECT dimension_id, current_level FROM skill_profile"
+    ).fetchall()
     cur_skills = {r[0]: r[1] for r in skill_rows}
     prev_skills = {}
     prev_synth = conn.execute("""
@@ -1593,17 +1862,19 @@ def api_synthesis_delta():
         if level != prev_level:
             skill_changes[dim] = {"from": prev_level, "to": level}
 
-    return jsonify({
-        "delta": {
-            "previous_run": prev_generated_at,
-            "sessions_delta": sessions_delta,
-            "productivity_delta": round(prod_delta, 3),
-            "misalignment_delta": round(mis_delta, 2),
-            "skill_changes": skill_changes,
-            "cur_productivity": round(cur_prod, 3),
-            "prev_productivity": round(prev_prod, 3),
+    return jsonify(
+        {
+            "delta": {
+                "previous_run": prev_generated_at,
+                "sessions_delta": sessions_delta,
+                "productivity_delta": round(prod_delta, 3),
+                "misalignment_delta": round(mis_delta, 2),
+                "skill_changes": skill_changes,
+                "cur_productivity": round(cur_prod, 3),
+                "prev_productivity": round(prev_prod, 3),
+            }
         }
-    })
+    )
 
 
 @app.route("/api/sessions-by-friction")
@@ -1624,12 +1895,45 @@ def api_sessions_by_friction():
 
     if not patterns and friction_type != "Other":
         # Fall back to keyword matching using significant words from the title
-        stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to",
-                      "for", "of", "with", "by", "from", "is", "it", "this", "that",
-                      "when", "without", "before", "after", "not", "what", "how",
-                      "consuming", "first", "wrong", "asking", "building", "investigating"}
-        words = [w.lower().strip("(),") for w in friction_type.split()
-                 if len(w) > 3 and w.lower() not in stop_words]
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "by",
+            "from",
+            "is",
+            "it",
+            "this",
+            "that",
+            "when",
+            "without",
+            "before",
+            "after",
+            "not",
+            "what",
+            "how",
+            "consuming",
+            "first",
+            "wrong",
+            "asking",
+            "building",
+            "investigating",
+        }
+        words = [
+            w.lower().strip("(),")
+            for w in friction_type.split()
+            if len(w) > 3 and w.lower() not in stop_words
+        ]
         patterns = words[:8]  # Use top 8 keywords
         if not patterns:
             return jsonify({"sessions": [], "error": "Unknown friction type"})
@@ -1649,16 +1953,24 @@ def api_sessions_by_friction():
 
     matched = []
     for row in rows:
-        sid, mis_json, prod, outcome, narrative, summary, proj, started, dur, turns = row
+        sid, mis_json, prod, outcome, narrative, summary, proj, started, dur, turns = (
+            row
+        )
         try:
-            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            items = (
+                json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            )
         except Exception:
             items = []
 
         matching_items = []
         for raw_desc in items:
             # misalignments can be dicts {turn, description} or plain strings
-            desc = raw_desc.get("description", "") if isinstance(raw_desc, dict) else str(raw_desc)
+            desc = (
+                raw_desc.get("description", "")
+                if isinstance(raw_desc, dict)
+                else str(raw_desc)
+            )
             desc_lower = desc.lower()
             if friction_type == "Other":
                 # Check if it matches NO named pattern
@@ -1674,21 +1986,25 @@ def api_sessions_by_friction():
                     matching_items.append(desc)
 
         if matching_items:
-            matched.append({
-                "session_id": sid,
-                "project": proj,
-                "productivity": round(prod or 0, 2),
-                "outcome": outcome,
-                "narrative": narrative,
-                "prompt_summary": summary,
-                "started_at": started,
-                "duration_min": round((dur or 0) / 60),
-                "turns": turns,
-                "matching_frictions": matching_items[:3],
-            })
+            matched.append(
+                {
+                    "session_id": sid,
+                    "project": proj,
+                    "productivity": round(prod or 0, 2),
+                    "outcome": outcome,
+                    "narrative": narrative,
+                    "prompt_summary": summary,
+                    "started_at": started,
+                    "duration_min": round((dur or 0) / 60),
+                    "turns": turns,
+                    "matching_frictions": matching_items[:3],
+                }
+            )
 
     matched.sort(key=lambda x: x["productivity"])  # worst first
-    return jsonify({"sessions": matched[:20], "type": friction_type, "total": len(matched)})
+    return jsonify(
+        {"sessions": matched[:20], "type": friction_type, "total": len(matched)}
+    )
 
 
 @app.route("/api/sessions/<session_id>/narrative")
@@ -1705,17 +2021,19 @@ def api_session_narrative(session_id):
     if not row:
         return jsonify({"narrative": None})
 
-    return jsonify({
-        "narrative": {
-            "narrative": row[0],
-            "what_worked": row[1],
-            "what_failed": row[2],
-            "user_quote": row[3],
-            "claude_md_suggestion": row[4],
-            "claude_md_rationale": row[5],
-            "prompt_summary": row[6],
+    return jsonify(
+        {
+            "narrative": {
+                "narrative": row[0],
+                "what_worked": row[1],
+                "what_failed": row[2],
+                "user_quote": row[3],
+                "claude_md_suggestion": row[4],
+                "claude_md_rationale": row[5],
+                "prompt_summary": row[6],
+            }
         }
-    })
+    )
 
 
 @app.route("/api/claude-md-suggestions")
@@ -1740,31 +2058,37 @@ def api_claude_md_suggestions():
         try:
             additions = json.loads(synth[0]) if isinstance(synth[0], str) else synth[0]
             for a in additions:
-                synthesis_suggestions.append({
-                    "rule": a.get("rule", ""),
-                    "rationale": a.get("rationale", ""),
-                    "evidence": a.get("evidence", ""),
-                    "source": "synthesis",
-                })
+                synthesis_suggestions.append(
+                    {
+                        "rule": a.get("rule", ""),
+                        "rationale": a.get("rationale", ""),
+                        "evidence": a.get("evidence", ""),
+                        "source": "synthesis",
+                    }
+                )
         except (json.JSONDecodeError, ValueError):
             pass
 
     session_suggestions = []
     for r in rows:
-        session_suggestions.append({
-            "session_id": r[0],
-            "rule": r[1],
-            "rationale": r[2],
-            "prompt_summary": r[3],
-            "project_name": r[4],
-            "started_at": _serialize(r[5]),
-            "source": "session",
-        })
+        session_suggestions.append(
+            {
+                "session_id": r[0],
+                "rule": r[1],
+                "rationale": r[2],
+                "prompt_summary": r[3],
+                "project_name": r[4],
+                "started_at": _serialize(r[5]),
+                "source": "session",
+            }
+        )
 
-    return jsonify({
-        "synthesis_suggestions": synthesis_suggestions,
-        "session_suggestions": session_suggestions,
-    })
+    return jsonify(
+        {
+            "synthesis_suggestions": synthesis_suggestions,
+            "session_suggestions": session_suggestions,
+        }
+    )
 
 
 @app.route("/api/session-highlights")
@@ -1790,14 +2114,21 @@ def api_session_highlights():
         ORDER BY j.productivity_ratio DESC LIMIT 1
     """).fetchone()
     if row:
-        highlights.append({
-            "type": "most_productive",
-            "label": "Most Productive",
-            "session_id": row[0], "productivity": row[1], "outcome": row[2],
-            "narrative": row[3], "prompt_summary": row[4],
-            "project": row[5], "started_at": _serialize(row[6]),
-            "duration": row[7], "what_worked": row[8],
-        })
+        highlights.append(
+            {
+                "type": "most_productive",
+                "label": "Most Productive",
+                "session_id": row[0],
+                "productivity": row[1],
+                "outcome": row[2],
+                "narrative": row[3],
+                "prompt_summary": row[4],
+                "project": row[5],
+                "started_at": _serialize(row[6]),
+                "duration": row[7],
+                "what_worked": row[8],
+            }
+        )
 
     # Most wasteful session
     row = conn.execute(f"""
@@ -1809,14 +2140,22 @@ def api_session_highlights():
         ORDER BY j.waste_turns DESC LIMIT 1
     """).fetchone()
     if row:
-        highlights.append({
-            "type": "most_wasteful",
-            "label": "Most Wasteful",
-            "session_id": row[0], "productivity": row[1], "outcome": row[2],
-            "narrative": row[3], "prompt_summary": row[4],
-            "project": row[5], "started_at": _serialize(row[6]),
-            "duration": row[7], "what_failed": row[8], "misalignments": row[9],
-        })
+        highlights.append(
+            {
+                "type": "most_wasteful",
+                "label": "Most Wasteful",
+                "session_id": row[0],
+                "productivity": row[1],
+                "outcome": row[2],
+                "narrative": row[3],
+                "prompt_summary": row[4],
+                "project": row[5],
+                "started_at": _serialize(row[6]),
+                "duration": row[7],
+                "what_failed": row[8],
+                "misalignments": row[9],
+            }
+        )
 
     # Most misaligned session
     row = conn.execute(f"""
@@ -1828,14 +2167,21 @@ def api_session_highlights():
         ORDER BY j.misalignment_count DESC LIMIT 1
     """).fetchone()
     if row and (not highlights or row[0] != highlights[-1].get("session_id")):
-        highlights.append({
-            "type": "most_misaligned",
-            "label": "Most Misaligned",
-            "session_id": row[0], "misalignments": row[1], "outcome": row[2],
-            "narrative": row[3], "prompt_summary": row[4],
-            "project": row[5], "started_at": _serialize(row[6]),
-            "duration": row[7], "what_failed": row[8],
-        })
+        highlights.append(
+            {
+                "type": "most_misaligned",
+                "label": "Most Misaligned",
+                "session_id": row[0],
+                "misalignments": row[1],
+                "outcome": row[2],
+                "narrative": row[3],
+                "prompt_summary": row[4],
+                "project": row[5],
+                "started_at": _serialize(row[6]),
+                "duration": row[7],
+                "what_failed": row[8],
+            }
+        )
 
     # Best prompt quality
     row = conn.execute(f"""
@@ -1848,14 +2194,21 @@ def api_session_highlights():
         ORDER BY (j.prompt_clarity + j.prompt_completeness) DESC LIMIT 1
     """).fetchone()
     if row:
-        highlights.append({
-            "type": "best_prompt",
-            "label": "Best Prompt",
-            "session_id": row[0], "clarity": row[1], "completeness": row[2],
-            "outcome": row[3], "narrative": row[4], "prompt_summary": row[5],
-            "project": row[6], "started_at": _serialize(row[7]),
-            "what_worked": row[8],
-        })
+        highlights.append(
+            {
+                "type": "best_prompt",
+                "label": "Best Prompt",
+                "session_id": row[0],
+                "clarity": row[1],
+                "completeness": row[2],
+                "outcome": row[3],
+                "narrative": row[4],
+                "prompt_summary": row[5],
+                "project": row[6],
+                "started_at": _serialize(row[7]),
+                "what_worked": row[8],
+            }
+        )
 
     # Longest successful session
     row = conn.execute(f"""
@@ -1867,14 +2220,21 @@ def api_session_highlights():
         ORDER BY s.duration_seconds DESC LIMIT 1
     """).fetchone()
     if row and (not highlights or row[0] != highlights[0].get("session_id")):
-        highlights.append({
-            "type": "longest_success",
-            "label": "Longest Success",
-            "session_id": row[0], "duration": row[1], "outcome": row[2],
-            "narrative": row[3], "prompt_summary": row[4],
-            "project": row[5], "started_at": _serialize(row[6]),
-            "turns": row[7], "what_worked": row[8],
-        })
+        highlights.append(
+            {
+                "type": "longest_success",
+                "label": "Longest Success",
+                "session_id": row[0],
+                "duration": row[1],
+                "outcome": row[2],
+                "narrative": row[3],
+                "prompt_summary": row[4],
+                "project": row[5],
+                "started_at": _serialize(row[6]),
+                "turns": row[7],
+                "what_worked": row[8],
+            }
+        )
 
     return jsonify({"highlights": highlights[:5]})
 
@@ -1927,17 +2287,29 @@ def api_response_times():
     if not deltas:
         return jsonify({"distribution": [], "avg_seconds": 0, "median_seconds": 0})
 
-    buckets = [('2-10s', 2, 10), ('10-30s', 10, 30), ('30s-1m', 30, 60),
-               ('1-2m', 60, 120), ('2-5m', 120, 300), ('5-15m', 300, 900), ('>15m', 900, 999999)]
-    dist = [{"label": b, "count": sum(1 for d in deltas if lo <= d < hi)} for b, lo, hi in buckets]
+    buckets = [
+        ("2-10s", 2, 10),
+        ("10-30s", 10, 30),
+        ("30s-1m", 30, 60),
+        ("1-2m", 60, 120),
+        ("2-5m", 120, 300),
+        ("5-15m", 300, 900),
+        (">15m", 900, 999999),
+    ]
+    dist = [
+        {"label": b, "count": sum(1 for d in deltas if lo <= d < hi)}
+        for b, lo, hi in buckets
+    ]
     avg_s = sum(deltas) / len(deltas)
     median_s = deltas[len(deltas) // 2]
 
-    return jsonify({
-        "distribution": dist,
-        "avg_seconds": round(avg_s, 1),
-        "median_seconds": round(median_s, 1),
-    })
+    return jsonify(
+        {
+            "distribution": dist,
+            "avg_seconds": round(avg_s, 1),
+            "median_seconds": round(median_s, 1),
+        }
+    )
 
 
 @app.route("/api/multi-clauding")
@@ -1979,38 +2351,22 @@ def api_multi_clauding():
     overlap_events = overlap_rows[0] or 0
     sessions_involved = overlap_rows[1] or 0
 
-    total_msgs = conn.execute(
-        "SELECT COUNT(*) FROM raw_entries WHERE entry_type='user' AND user_text_length > 0"
-    ).fetchone()[0]
-
-    # Overlap message count = messages in sessions that had any concurrent activity
-    overlap_msg_count = conn.execute("""
-        WITH bucketed AS (
-            SELECT session_id,
-                   CAST(strftime('%s', timestamp_utc) AS INTEGER) / 300 as bucket
-            FROM raw_entries
-            WHERE entry_type = 'user' AND user_text_length > 0
-              AND session_id IS NOT NULL AND timestamp_utc IS NOT NULL
-            GROUP BY session_id, bucket
-        ),
-        overlapping_sessions AS (
-            SELECT DISTINCT b.session_id
-            FROM bucketed b
-            JOIN bucketed b2 ON b.bucket = b2.bucket AND b.session_id != b2.session_id
-        )
-        SELECT COUNT(*) FROM raw_entries
-        WHERE session_id IN (SELECT session_id FROM overlapping_sessions)
-          AND entry_type = 'user'
-    """).fetchone()[0]
-
-    pct = min(round(overlap_msg_count / total_msgs * 100) if total_msgs else 0, 100)
-    return jsonify({
-        "overlap_events": overlap_events,
-        "sessions_involved": sessions_involved,
-        "sessions_involved_pct": round(sessions_involved * 100 / max(conn.execute(
-            "SELECT COUNT(DISTINCT session_id) FROM sessions"
-        ).fetchone()[0], 1)),
-    })
+    return jsonify(
+        {
+            "overlap_events": overlap_events,
+            "sessions_involved": sessions_involved,
+            "sessions_involved_pct": round(
+                sessions_involved
+                * 100
+                / max(
+                    conn.execute(
+                        "SELECT COUNT(DISTINCT session_id) FROM sessions"
+                    ).fetchone()[0],
+                    1,
+                )
+            ),
+        }
+    )
 
 
 @app.route("/api/friction")
@@ -2038,7 +2394,9 @@ def api_friction():
             if not isinstance(descs, list):
                 continue
             for item in descs:
-                desc_l = (item.get("description", "") if isinstance(item, dict) else str(item)).lower()
+                desc_l = (
+                    item.get("description", "") if isinstance(item, dict) else str(item)
+                ).lower()
                 matched = False
                 for label, keywords in _FRICTION_PATTERNS:
                     if any(kw in desc_l for kw in keywords):
@@ -2052,8 +2410,7 @@ def api_friction():
 
     # Sort by count descending, but always put "Other" last
     sorted_items = sorted(
-        ((k, v) for k, v in counter.items() if k != "Other"),
-        key=lambda x: -x[1]
+        ((k, v) for k, v in counter.items() if k != "Other"), key=lambda x: -x[1]
     )
     if "Other" in counter:
         sorted_items.append(("Other", counter["Other"]))
@@ -2078,10 +2435,14 @@ def api_tool_errors():
         GROUP BY tool_result_error_type
         ORDER BY count DESC
     """).fetchall()
-    return jsonify({
-        "tool_errors": [{"label": r[0].replace("_", " ").title(), "count": r[1]} for r in rows],
-        "needs_reingest": len(rows) == 0,
-    })
+    return jsonify(
+        {
+            "tool_errors": [
+                {"label": r[0].replace("_", " ").title(), "count": r[1]} for r in rows
+            ],
+            "needs_reingest": len(rows) == 0,
+        }
+    )
 
 
 @app.route("/api/languages")
@@ -2090,34 +2451,112 @@ def api_languages():
     conn = get_conn()
 
     # Check if session_languages table exists
-    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
     if "session_languages" not in tables:
         return jsonify({"languages": [], "needs_reingest": True})
 
     # Only recognised code/config/markup extensions — no images, binaries, or tool outputs
     _CODE_EXTS = {
-        "py", "ts", "tsx", "js", "jsx", "mjs", "cjs",
-        "html", "htm", "css", "scss", "sass",
-        "md", "mdx", "rst",
-        "json", "yaml", "yml", "toml", "ini", "cfg", "env",
-        "sh", "bash", "zsh", "fish",
-        "go", "rs", "rb", "java", "kt", "swift", "c", "cpp", "h", "hpp",
-        "sql", "prisma", "graphql", "gql",
-        "ipynb", "r", "scala", "clj", "ex", "exs", "erl", "hs", "lua",
-        "tf", "hcl", "dockerfile",
+        "py",
+        "ts",
+        "tsx",
+        "js",
+        "jsx",
+        "mjs",
+        "cjs",
+        "html",
+        "htm",
+        "css",
+        "scss",
+        "sass",
+        "md",
+        "mdx",
+        "rst",
+        "json",
+        "yaml",
+        "yml",
+        "toml",
+        "ini",
+        "cfg",
+        "env",
+        "sh",
+        "bash",
+        "zsh",
+        "fish",
+        "go",
+        "rs",
+        "rb",
+        "java",
+        "kt",
+        "swift",
+        "c",
+        "cpp",
+        "h",
+        "hpp",
+        "sql",
+        "prisma",
+        "graphql",
+        "gql",
+        "ipynb",
+        "r",
+        "scala",
+        "clj",
+        "ex",
+        "exs",
+        "erl",
+        "hs",
+        "lua",
+        "tf",
+        "hcl",
+        "dockerfile",
     }
     _LABEL_MAP = {
-        "py": "Python", "ts": "TypeScript", "tsx": "TSX", "js": "JavaScript",
-        "jsx": "JSX", "mjs": "JavaScript", "cjs": "JavaScript",
-        "md": "Markdown", "mdx": "MDX", "rst": "reStructuredText",
-        "html": "HTML", "htm": "HTML", "css": "CSS", "scss": "SCSS", "sass": "Sass",
-        "json": "JSON", "yaml": "YAML", "yml": "YAML", "sh": "Shell",
-        "bash": "Shell", "zsh": "Shell", "go": "Go", "rs": "Rust",
-        "java": "Java", "rb": "Ruby", "kt": "Kotlin", "swift": "Swift",
-        "c": "C", "cpp": "C++", "h": "C/C++", "sql": "SQL",
-        "toml": "TOML", "ipynb": "Notebook", "tf": "Terraform", "hcl": "HCL",
-        "dockerfile": "Dockerfile", "graphql": "GraphQL", "gql": "GraphQL",
-        "prisma": "Prisma", "scala": "Scala", "r": "R",
+        "py": "Python",
+        "ts": "TypeScript",
+        "tsx": "TSX",
+        "js": "JavaScript",
+        "jsx": "JSX",
+        "mjs": "JavaScript",
+        "cjs": "JavaScript",
+        "md": "Markdown",
+        "mdx": "MDX",
+        "rst": "reStructuredText",
+        "html": "HTML",
+        "htm": "HTML",
+        "css": "CSS",
+        "scss": "SCSS",
+        "sass": "Sass",
+        "json": "JSON",
+        "yaml": "YAML",
+        "yml": "YAML",
+        "sh": "Shell",
+        "bash": "Shell",
+        "zsh": "Shell",
+        "go": "Go",
+        "rs": "Rust",
+        "java": "Java",
+        "rb": "Ruby",
+        "kt": "Kotlin",
+        "swift": "Swift",
+        "c": "C",
+        "cpp": "C++",
+        "h": "C/C++",
+        "sql": "SQL",
+        "toml": "TOML",
+        "ipynb": "Notebook",
+        "tf": "Terraform",
+        "hcl": "HCL",
+        "dockerfile": "Dockerfile",
+        "graphql": "GraphQL",
+        "gql": "GraphQL",
+        "prisma": "Prisma",
+        "scala": "Scala",
+        "r": "R",
     }
 
     rows = conn.execute("""
@@ -2136,7 +2575,9 @@ def api_languages():
             continue
         label = _LABEL_MAP.get(r[0], r[0].upper())
         merged[label] = merged.get(label, 0) + r[1]
-    items = [{"label": k, "count": v} for k, v in sorted(merged.items(), key=lambda x: -x[1])][:12]
+    items = [
+        {"label": k, "count": v} for k, v in sorted(merged.items(), key=lambda x: -x[1])
+    ][:12]
     return jsonify({"languages": items, "needs_reingest": len(items) == 0})
 
 
@@ -2144,6 +2585,7 @@ def api_languages():
 def api_bash_commands():
     """Top bash commands by extracting the first word/program from bash tool_input_preview."""
     import re as _re
+
     conn = get_conn()
 
     # Check if tool_input_preview column exists
@@ -2163,6 +2605,7 @@ def api_bash_commands():
     # Extract the first actual command from the preview
     _STRIP_PREFIXES = ("nohup ", "sudo ", "eval ", "env ", "time ")
     from collections import Counter
+
     cmd_counter: Counter = Counter()
 
     for (preview,) in rows:
@@ -2171,28 +2614,27 @@ def api_bash_commands():
         # Strip leading whitespace, shell var assignments like FOO=bar cmd
         cmd = preview.strip()
         # Strip env var assignments: VAR=value cmd -> cmd
-        cmd = _re.sub(r'^([A-Z_][A-Z0-9_]*=[^\s]*\s+)+', '', cmd)
+        cmd = _re.sub(r"^([A-Z_][A-Z0-9_]*=[^\s]*\s+)+", "", cmd)
         # Strip common wrappers
         for prefix in _STRIP_PREFIXES:
             if cmd.startswith(prefix):
-                cmd = cmd[len(prefix):]
+                cmd = cmd[len(prefix) :]
         # Get first token
-        first = _re.split(r'[\s|;&]', cmd)[0].strip()
+        first = _re.split(r"[\s|;&]", cmd)[0].strip()
         # Strip shell path prefix (e.g., /usr/bin/grep -> grep)
-        if '/' in first:
-            first = first.rsplit('/', 1)[-1]
+        if "/" in first:
+            first = first.rsplit("/", 1)[-1]
         # Normalise
-        first = first.lower().strip('"\' ')
+        first = first.lower().strip("\"' ")
         if not first or len(first) > 40:
             continue
         # Skip numbers and special chars only
-        if not _re.search(r'[a-z]', first):
+        if not _re.search(r"[a-z]", first):
             continue
         cmd_counter[first] += 1
 
     items = [
-        {"label": cmd, "value": count}
-        for cmd, count in cmd_counter.most_common(20)
+        {"label": cmd, "value": count} for cmd, count in cmd_counter.most_common(20)
     ]
     return jsonify({"bash_commands": items})
 
@@ -2246,10 +2688,7 @@ def api_heatmap_calendar():
 
     return jsonify(
         {
-            "calendar": [
-                {"date": str(r[0]), "count": r[1]}
-                for r in rows
-            ],
+            "calendar": [{"date": str(r[0]), "count": r[1]} for r in rows],
         }
     )
 
@@ -2257,6 +2696,7 @@ def api_heatmap_calendar():
 # ---------------------------------------------------------------------------
 # New features: Groundhog Day, Lost Hours, Streaks, etc.
 # ---------------------------------------------------------------------------
+
 
 def _categorize_friction(desc_lower: str) -> str:
     """Categorize a misalignment description into a friction pattern name."""
@@ -2284,36 +2724,45 @@ def api_groundhog_day():
 
     # Group by (project_name, friction_category)
     from collections import defaultdict
+
     groups = defaultdict(list)
     for sid, mis_json, user_quote, prompt_summary, project, started_at in rows:
         try:
-            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            items = (
+                json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            )
         except Exception:
             continue
-        short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        short_project = (
+            (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        )
         seen_cats = set()
         for item in items:
-            desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+            desc = item.get("description", "") if isinstance(item, dict) else str(item)
             cat = _categorize_friction(desc.lower())
             if cat not in seen_cats:
                 seen_cats.add(cat)
                 key = (short_project, cat)
-                groups[key].append({
-                    "session_id": sid,
-                    "date": str(started_at)[:10] if started_at else "",
-                    "user_quote": (user_quote or "")[:120],
-                    "prompt_summary": (prompt_summary or "")[:100],
-                })
+                groups[key].append(
+                    {
+                        "session_id": sid,
+                        "date": str(started_at)[:10] if started_at else "",
+                        "user_quote": (user_quote or "")[:120],
+                        "prompt_summary": (prompt_summary or "")[:100],
+                    }
+                )
 
     loops = []
     for (project, pattern), sessions in groups.items():
         if len(sessions) >= 2:
-            loops.append({
-                "project": project,
-                "pattern": pattern,
-                "count": len(sessions),
-                "sessions": sessions[-5:],  # most recent 5
-            })
+            loops.append(
+                {
+                    "project": project,
+                    "pattern": pattern,
+                    "count": len(sessions),
+                    "sessions": sessions[-5:],  # most recent 5
+                }
+            )
 
     loops.sort(key=lambda x: -x["count"])
     return jsonify({"loops": loops})
@@ -2335,6 +2784,7 @@ def api_lost_hours():
     """).fetchall()
 
     from collections import defaultdict
+
     cat_data = defaultdict(lambda: {"waste_hours": 0.0, "sessions": 0, "cost_usd": 0.0})
     total_waste_hours = 0.0
     total_cost_usd = 0.0
@@ -2347,9 +2797,17 @@ def api_lost_hours():
         cats_in_session = set()
         if mis_json:
             try:
-                items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+                items = (
+                    json.loads(mis_json)
+                    if isinstance(mis_json, str)
+                    else (mis_json or [])
+                )
                 for item in items:
-                    desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+                    desc = (
+                        item.get("description", "")
+                        if isinstance(item, dict)
+                        else str(item)
+                    )
                     cats_in_session.add(_categorize_friction(desc.lower()))
             except Exception:
                 pass
@@ -2380,11 +2838,13 @@ def api_lost_hours():
         key=lambda x: -x["waste_hours"],
     )
 
-    return jsonify({
-        "total_waste_hours": round(total_waste_hours, 2),
-        "total_cost_usd": round(total_cost_usd, 2),
-        "by_category": by_category,
-    })
+    return jsonify(
+        {
+            "total_waste_hours": round(total_waste_hours, 2),
+            "total_cost_usd": round(total_cost_usd, 2),
+            "by_category": by_category,
+        }
+    )
 
 
 @app.route("/api/streaks")
@@ -2410,9 +2870,17 @@ def api_streaks():
         cats = set()
         if mis_json:
             try:
-                items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+                items = (
+                    json.loads(mis_json)
+                    if isinstance(mis_json, str)
+                    else (mis_json or [])
+                )
                 for item in items:
-                    desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+                    desc = (
+                        item.get("description", "")
+                        if isinstance(item, dict)
+                        else str(item)
+                    )
                     cats.add(_categorize_friction(desc.lower()))
             except Exception:
                 pass
@@ -2424,6 +2892,7 @@ def api_streaks():
         all_cats.update(cats)
 
     from datetime import date as _date
+
     streaks = []
     for cat in sorted(all_cats):
         if cat == "Other":
@@ -2454,19 +2923,22 @@ def api_streaks():
         if last_occurrence_date:
             try:
                 from datetime import datetime
+
                 last_dt = datetime.strptime(last_occurrence_date, "%Y-%m-%d").date()
                 today_dt = _date.today()
                 days_since = (today_dt - last_dt).days
             except Exception:
                 pass
 
-        streaks.append({
-            "pattern": cat,
-            "current_streak": current_streak,
-            "best_streak": best_streak,
-            "last_occurrence": last_occurrence_date,
-            "days_since": days_since,
-        })
+        streaks.append(
+            {
+                "pattern": cat,
+                "current_streak": current_streak,
+                "best_streak": best_streak,
+                "last_occurrence": last_occurrence_date,
+                "days_since": days_since,
+            }
+        )
 
     streaks.sort(key=lambda x: -x["current_streak"])
     return jsonify({"streaks": streaks})
@@ -2487,16 +2959,23 @@ def api_friction_pattern_map():
     """).fetchall()
 
     from collections import defaultdict
+
     matrix = defaultdict(lambda: defaultdict(int))
     projects_set = set()
     patterns_set = set()
 
     for mis_json, project in rows:
-        short_project = (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        short_project = (
+            (project or "").replace("-Users-npow-code-", "").replace("-Users-npow-", "")
+        )
         try:
-            items = json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            items = (
+                json.loads(mis_json) if isinstance(mis_json, str) else (mis_json or [])
+            )
             for item in items:
-                desc = (item.get("description", "") if isinstance(item, dict) else str(item))
+                desc = (
+                    item.get("description", "") if isinstance(item, dict) else str(item)
+                )
                 cat = _categorize_friction(desc.lower())
                 matrix[short_project][cat] += 1
                 projects_set.add(short_project)
@@ -2506,14 +2985,18 @@ def api_friction_pattern_map():
 
     # Sort projects by total friction count
     projects = sorted(projects_set, key=lambda p: -sum(matrix[p].values()))[:10]
-    patterns = sorted(patterns_set, key=lambda pa: -sum(matrix[p].get(pa, 0) for p in projects))
+    patterns = sorted(
+        patterns_set, key=lambda pa: -sum(matrix[p].get(pa, 0) for p in projects)
+    )
 
     matrix_out = {p: dict(matrix[p]) for p in projects}
-    return jsonify({
-        "projects": projects,
-        "patterns": patterns,
-        "matrix": matrix_out,
-    })
+    return jsonify(
+        {
+            "projects": projects,
+            "patterns": patterns,
+            "matrix": matrix_out,
+        }
+    )
 
 
 @app.route("/api/claudemd-effectiveness")
@@ -2529,7 +3012,11 @@ def api_claudemd_effectiveness():
         return jsonify({"effectiveness": []})
 
     try:
-        additions = json.loads(synth_row[0]) if isinstance(synth_row[0], str) else (synth_row[0] or [])
+        additions = (
+            json.loads(synth_row[0])
+            if isinstance(synth_row[0], str)
+            else (synth_row[0] or [])
+        )
     except (json.JSONDecodeError, ValueError):
         return jsonify({"effectiveness": []})
 
@@ -2590,16 +3077,24 @@ def api_claudemd_effectiveness():
         else:
             status = "insufficient_data"
 
-        results.append({
-            "rule": rule,
-            "first_seen": first_seen,
-            "before_sessions": before_total,
-            "after_sessions": after_total,
-            "before_friction_rate": round(before_rate, 2) if before_rate is not None else None,
-            "after_friction_rate": round(after_rate, 2) if after_rate is not None else None,
-            "delta": round(delta, 2) if (before_rate is not None and after_rate is not None) else None,
-            "status": status,
-        })
+        results.append(
+            {
+                "rule": rule,
+                "first_seen": first_seen,
+                "before_sessions": before_total,
+                "after_sessions": after_total,
+                "before_friction_rate": round(before_rate, 2)
+                if before_rate is not None
+                else None,
+                "after_friction_rate": round(after_rate, 2)
+                if after_rate is not None
+                else None,
+                "delta": round(delta, 2)
+                if (before_rate is not None and after_rate is not None)
+                else None,
+                "status": status,
+            }
+        )
 
     return jsonify({"effectiveness": results})
 
@@ -2608,6 +3103,7 @@ def api_claudemd_effectiveness():
 def api_rewrite_prompt(session_id):
     """Generate a rewritten version of the session's opening prompt."""
     from .llm_judge import rewrite_prompt
+
     conn = get_conn()
     result = rewrite_prompt(session_id, conn)
     return jsonify(result)
@@ -2617,6 +3113,7 @@ def api_rewrite_prompt(session_id):
 def api_session_handoff(session_id):
     """Generate a handoff memo for a session."""
     from .llm_judge import generate_handoff
+
     conn = get_conn()
     result = generate_handoff(session_id, conn)
     return jsonify(result)
@@ -2626,6 +3123,7 @@ def api_session_handoff(session_id):
 def api_predict_friction():
     """Predict friction risk for a new prompt."""
     from .llm_judge import predict_friction
+
     body = request.get_json(silent=True) or {}
     prompt_text = body.get("prompt", "").strip()
     if not prompt_text:
@@ -2639,6 +3137,7 @@ def api_predict_friction():
 def api_claudemd_audit():
     """Audit CLAUDE.md rules against recent session data."""
     from .llm_judge import audit_claudemd
+
     conn = get_conn()
     result = audit_claudemd(conn)
     return jsonify(result)
@@ -2649,7 +3148,13 @@ def api_claudemd_audit():
 # ---------------------------------------------------------------------------
 
 _PROCESS_MONITOR_JS = (
-    Path.home() / "code" / "agenttrace" / "views" / "process-monitor" / "dist" / "index.js"
+    Path.home()
+    / "code"
+    / "agenttrace"
+    / "views"
+    / "process-monitor"
+    / "dist"
+    / "index.js"
 )
 
 
@@ -2673,6 +3178,7 @@ def api_session_dag(session_id):
     from progress_entries (parent_tool_id = the assistant entry_id).
     """
     import json as _json
+
     conn = get_conn()
 
     # Ensure indexes exist (created once, fast no-op thereafter)
@@ -2686,7 +3192,8 @@ def api_session_dag(session_id):
     """)
 
     # Main-thread turns (not sidechain), most recent 150 turns
-    turns_rows = conn.execute("""
+    turns_rows = conn.execute(
+        """
         SELECT r.entry_id, r.timestamp_utc, r.tool_names, r.tool_input_preview,
                r.duration_ms,
                CASE WHEN tr.entry_id IS NOT NULL THEN 1 ELSE 0 END AS completed,
@@ -2705,21 +3212,24 @@ def api_session_dag(session_id):
         LEFT JOIN raw_entries tr
                ON tr.parent_uuid = r.entry_id AND tr.is_tool_result = 1
         ORDER BY r.timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     # Fetch ALL agent_progress entries for this session in one query, then
     # trace chains in Python (avoids N slow recursive CTEs).
     # Chain structure: first entry has parent_tool_id = raw Task entry_id;
     # subsequent entries chain: parent_tool_id = previous progress entry_id.
-    all_prog = conn.execute("""
+    all_prog = conn.execute(
+        """
         SELECT entry_id, parent_tool_id, tool_name, has_result, result_error, timestamp_utc
         FROM progress_entries
         WHERE session_id = ? AND progress_type = 'agent_progress'
         ORDER BY timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
-    # Build lookup: entry_id → row
-    prog_by_id: dict = {r[0]: r for r in all_prog}
     # Build lookup: parent_tool_id → [children]
     prog_children: dict = {}
     for r in all_prog:
@@ -2737,15 +3247,29 @@ def api_session_dag(session_id):
                 continue
             visited.add(eid)
             if row[2]:  # tool_name is not None
-                result.append({"tool": row[2], "completed": bool(row[3]),
-                                "error": bool(row[4]), "timestamp": row[5]})
+                result.append(
+                    {
+                        "tool": row[2],
+                        "completed": bool(row[3]),
+                        "error": bool(row[4]),
+                        "timestamp": row[5],
+                    }
+                )
             stack.extend(prog_children.get(eid, []))
         result.sort(key=lambda x: x["timestamp"])
         return result
 
     # Build turns
     turns = []
-    for entry_id, ts, tool_names_json, preview, duration_ms, completed, error in turns_rows:
+    for (
+        entry_id,
+        ts,
+        tool_names_json,
+        preview,
+        duration_ms,
+        completed,
+        error,
+    ) in turns_rows:
         try:
             names = _json.loads(tool_names_json) if tool_names_json else []
         except Exception:
@@ -2755,16 +3279,18 @@ def api_session_dag(session_id):
         if "Task" in names:
             subagent_calls = collect_chain(entry_id)
 
-        turns.append({
-            "entryId":      entry_id,
-            "timestamp":    ts,
-            "tools":        names,
-            "preview":      (preview or "").strip()[:120],
-            "durationMs":   duration_ms,
-            "completed":    bool(completed),
-            "error":        bool(error),
-            "subagentCalls": subagent_calls,  # None if no Task in this turn
-        })
+        turns.append(
+            {
+                "entryId": entry_id,
+                "timestamp": ts,
+                "tools": names,
+                "preview": (preview or "").strip()[:120],
+                "durationMs": duration_ms,
+                "completed": bool(completed),
+                "error": bool(error),
+                "subagentCalls": subagent_calls,  # None if no Task in this turn
+            }
+        )
 
     return jsonify({"sessionId": session_id, "turns": turns})
 
@@ -2773,9 +3299,11 @@ def api_session_dag(session_id):
 def api_session_subagents(session_id):
     """Return Task/subagent calls within a session, with completion status."""
     import json as _json
+
     conn = get_conn()
 
-    rows = conn.execute("""
+    rows = conn.execute(
+        """
         SELECT
             r.entry_id,
             r.timestamp_utc                                  AS started_at,
@@ -2803,10 +3331,21 @@ def api_session_subagents(session_id):
              OR r.tool_names LIKE '%Write%'
           )
         ORDER BY r.timestamp_utc
-    """, [session_id]).fetchall()
+    """,
+        [session_id],
+    ).fetchall()
 
     agents = []
-    for entry_id, started_at, preview, tool_names_json, completed, error, finished_at, output in rows:
+    for (
+        entry_id,
+        started_at,
+        preview,
+        tool_names_json,
+        completed,
+        error,
+        finished_at,
+        output,
+    ) in rows:
         try:
             names = _json.loads(tool_names_json) if tool_names_json else []
         except Exception:
@@ -2818,23 +3357,26 @@ def api_session_subagents(session_id):
         if started_at and finished_at:
             try:
                 from datetime import datetime as _dt
+
                 s = _dt.fromisoformat(started_at.replace("Z", "+00:00"))
                 f = _dt.fromisoformat(finished_at.replace("Z", "+00:00"))
                 duration_ms = int((f - s).total_seconds() * 1000)
             except Exception:
                 pass
 
-        agents.append({
-            "id":          entry_id,
-            "tool":        tool,
-            "prompt":      (preview or "").strip()[:120],
-            "output":      (output or "").strip()[:300],
-            "completed":   bool(completed),
-            "error":       bool(error),
-            "startedAt":   started_at,
-            "finishedAt":  finished_at,
-            "durationMs":  duration_ms,
-        })
+        agents.append(
+            {
+                "id": entry_id,
+                "tool": tool,
+                "prompt": (preview or "").strip()[:120],
+                "output": (output or "").strip()[:300],
+                "completed": bool(completed),
+                "error": bool(error),
+                "startedAt": started_at,
+                "finishedAt": finished_at,
+                "durationMs": duration_ms,
+            }
+        )
 
     return jsonify({"sessionId": session_id, "agents": agents})
 
@@ -2846,15 +3388,15 @@ def api_live():
     conn = get_conn()
 
     _PRICING = {
-        "claude-opus-4-6":              (15.0,  75.0),
-        "claude-sonnet-4-6":            ( 3.0,  15.0),
-        "claude-sonnet-4-5":            ( 3.0,  15.0),
-        "claude-haiku-4-5-20251001":    ( 0.8,   4.0),
-        "claude-haiku-4-5":             ( 0.8,   4.0),
-        "claude-3-5-sonnet-20241022":   ( 3.0,  15.0),
-        "claude-3-7-sonnet-20250219":   ( 3.0,  15.0),
-        "claude-3-5-haiku-20241022":    ( 0.8,   4.0),
-        "claude-3-opus-20240229":       (15.0,  75.0),
+        "claude-opus-4-6": (15.0, 75.0),
+        "claude-sonnet-4-6": (3.0, 15.0),
+        "claude-sonnet-4-5": (3.0, 15.0),
+        "claude-haiku-4-5-20251001": (0.8, 4.0),
+        "claude-haiku-4-5": (0.8, 4.0),
+        "claude-3-5-sonnet-20241022": (3.0, 15.0),
+        "claude-3-7-sonnet-20250219": (3.0, 15.0),
+        "claude-3-5-haiku-20241022": (0.8, 4.0),
+        "claude-3-opus-20240229": (15.0, 75.0),
     }
 
     def cost_usd(model, inp, out):
@@ -3003,10 +3545,26 @@ def api_live():
 
     agents = []
     for r in rows:
-        (session_id, tool_names_json, tool_started_at, is_running,
-         project_name, started_at, last_active,
-         first_prompt, turn_count, total_in, total_out, error_count, model,
-         recent_ctx, cwd, tool_file_paths_json, tool_input_preview, last_snippet) = r
+        (
+            session_id,
+            tool_names_json,
+            tool_started_at,
+            is_running,
+            project_name,
+            started_at,
+            last_active,
+            first_prompt,
+            turn_count,
+            total_in,
+            total_out,
+            error_count,
+            model,
+            recent_ctx,
+            cwd,
+            tool_file_paths_json,
+            tool_input_preview,
+            last_snippet,
+        ) = r
 
         try:
             names = _json.loads(tool_names_json) if tool_names_json else []
@@ -3014,7 +3572,9 @@ def api_live():
             names = []
 
         try:
-            file_paths = _json.loads(tool_file_paths_json) if tool_file_paths_json else []
+            file_paths = (
+                _json.loads(tool_file_paths_json) if tool_file_paths_json else []
+            )
         except Exception:
             file_paths = []
 
@@ -3029,6 +3589,7 @@ def api_live():
             context = tool_input_preview[:120]
         elif current_tool and file_paths:
             import os as _os
+
             context = _os.path.basename(file_paths[0])
         elif last_snippet:
             context = last_snippet.strip().split("\n")[0].strip()[:80]
@@ -3041,30 +3602,36 @@ def api_live():
             label = project_name or session_id[:8] or "unknown"
 
         try:
-            ctx_pct = round(int(recent_ctx or 0) / 200_000 * 100, 1) if recent_ctx else 0
+            ctx_pct = (
+                round(int(recent_ctx or 0) / 200_000 * 100, 1) if recent_ctx else 0
+            )
         except (ValueError, TypeError):
             ctx_pct = 0
 
-        agents.append({
-            "id":             session_id,
-            "name":           label,
-            "status":         status,
-            "currentTool":    current_tool if is_running else None,
-            "toolStartedAt":  tool_started_at if is_running else None,
-            "sessionId":      session_id,
-            "projectName":    project_name or "",
-            "startedAt":      started_at or last_active,
-            "lastActivityAt": last_active,
-            "parentId":       None,
-            "isSubagent":     False,
-            "turnCount":      int(turn_count  or 0),
-            "costUsd":        round(cost_usd(model or "", int(total_in or 0), int(total_out or 0)), 4),
-            "errorCount":     int(error_count or 0),
-            "errorStreak":    streaks.get(session_id, 0),
-            "ctxPct":         ctx_pct,
-            "model":          model or "",
-            "cwd":            cwd or "",
-            "context":        context,
-        })
+        agents.append(
+            {
+                "id": session_id,
+                "name": label,
+                "status": status,
+                "currentTool": current_tool if is_running else None,
+                "toolStartedAt": tool_started_at if is_running else None,
+                "sessionId": session_id,
+                "projectName": project_name or "",
+                "startedAt": started_at or last_active,
+                "lastActivityAt": last_active,
+                "parentId": None,
+                "isSubagent": False,
+                "turnCount": int(turn_count or 0),
+                "costUsd": round(
+                    cost_usd(model or "", int(total_in or 0), int(total_out or 0)), 4
+                ),
+                "errorCount": int(error_count or 0),
+                "errorStreak": streaks.get(session_id, 0),
+                "ctxPct": ctx_pct,
+                "model": model or "",
+                "cwd": cwd or "",
+                "context": context,
+            }
+        )
 
     return jsonify({"agents": agents})

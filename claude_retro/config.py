@@ -327,27 +327,96 @@ SKILL_INIT_COMMANDS = ["/init", "claude.md", "CLAUDE.md"]
 # Nudges: keyed by (dimension_id, target_level) -> nudge text
 # These are fallbacks — running the LLM judge replaces them with evidence-backed insights from your actual sessions.
 SKILL_NUDGES = {
-    ("D1", 2): "Your sessions aren't using context management commands. Long sessions accumulate stale context that causes Claude to repeat mistakes or forget earlier decisions. Try: '/compact focus on the current bug — drop the earlier architecture discussion'.",
-    ("D1", 3): "You're using /compact but without focus instructions, so irrelevant context stays alive. When switching tasks mid-session, use '/clear' to fully reset, or '/compact only keep the changes made to auth.py and the current error'.",
-    ("D1", 4): "Front-load all file reads before making changes in long sessions. Use @filename references instead of pasting content inline. When a session exceeds ~50 turns, split into a new session with a fresh summary prompt.",
-    ("D2", 2): "You're diving into implementation without an explicit plan. For tasks touching 3+ files, list the changes upfront first. Try: 'Before coding, list every file we'll need to change and what changes each needs. Don't start implementing yet.'",
-    ("D2", 3): "Use Plan Mode for complex tasks — it forces Claude to show its reasoning before touching code. Say: 'Enter plan mode and propose an implementation strategy. Don't write any code yet.' This catches wrong approaches before they cost turns.",
-    ("D2", 4): "Use the Task tool to run independent subtasks in parallel. Spin one agent to research the API, another to set up the test scaffold, while you review the plan — this can cut multi-hour sessions to minutes.",
-    ("D3", 2): "Your initial prompts often lack the specifics Claude needs to avoid correction loops. Include: the exact file path, the full error message, and what 'done' looks like. 'Fix the bug' → 'The test in auth_test.py:47 fails with KeyError: user_id — fix the implementation, not the test'.",
-    ("D3", 3): "Add explicit constraints upfront to prevent Claude going in the wrong direction. Before starting: 'Do not change the public API. Existing tests must still pass. Only modify the implementation inside _process_batch().' This prevents the most common correction loops.",
-    ("D3", 4): "For hard problems, activate extended reasoning: 'Think step by step before proposing a solution. Consider edge cases around concurrent writes and what happens if the queue is empty.' Front-loading analysis reduces back-and-forth on missed cases.",
-    ("D4", 2): "No CLAUDE.md detected. This file encodes your conventions so Claude doesn't need to be told them every session. Run '/init' to generate a starter, then customize it with your real preferences — test commands, style rules, things Claude should never do.",
-    ("D5", 2): "High Bash usage for file operations suggests underuse of Claude's built-in tools. Use Read/Edit/Grep/Glob directly — they're faster, have better error messages, and don't require shell quoting. Reserve Bash for running tests, builds, and CLI tools.",
-    ("D5", 3): "Use the Task tool for parallel research. Instead of blocking on 'find all usages of this function', spawn a Task agent for the search while you continue with the main work: 'Use the Task tool to search the codebase for X in the background'.",
-    ("D6", 2): "Sessions show file edits without test runs. Always end implementation prompts with: 'After making changes, run the test suite and show me the output. If any tests fail, fix them before presenting the result as done.'",
-    ("D6", 3): "Adopt test-first ordering: ask Claude to run the failing test first to confirm the failure, then fix the implementation. 'First run pytest test_auth.py::test_login -v to show the failure, then fix the code until it passes.'",
-    ("D6", 4): "After fixing a bug, habitually add: 'Now add a regression test that would have caught this bug.' Use /commit to create atomic checkpoints after each working change so you can safely revert.",
-    ("D7", 2): "Sessions have file changes but no commits. Use /commit to let Claude write commit messages from the diff — it's faster and produces better messages. Commit frequently to create safe rollback points.",
-    ("D7", 3): "Let Claude create PRs: 'Create a PR for these changes with a description of what was fixed and why.' Claude reads the diff and writes context-aware PR descriptions better than most humans.",
-    ("D8", 2): "Debug prompts are missing the full error context. Always paste the complete stack trace — not just the last line. The specific file, line number, and exception type often contain the answer. 'Here's the full traceback: [paste]. What's the root cause?'",
-    ("D8", 3): "When Claude fixes symptoms instead of causes, say: 'Don't change any code yet — trace this error back to its root cause and explain why it's happening.' This prevents multi-turn cycles chasing the same underlying bug.",
-    ("D8", 4): "After fixing a recurring bug: 'Add a regression test that would have caught this. Commit the fix separately from the test so the history is clean.' This creates both a safety net and useful git history.",
-    ("D9", 2): "Long sessions with unrelated tasks cause Claude to lose focus and mix up context between subtasks. Start a new Claude session for each distinct goal — sessions under 20 turns with a single task have significantly higher productivity.",
-    ("D9", 3): "Use --continue to resume your last session, or --resume [session-id] for a specific conversation. For interrupted multi-step work, start with: 'Summarize what we completed last session and what's still left to do.'",
-    ("D9", 4): "Run independent tasks in parallel Claude sessions. While one session is testing/building, start another for the next feature. Use background agents for CI-style workflows: 'Run this full test suite in the background and notify me when done.'",
+    (
+        "D1",
+        2,
+    ): "Your sessions aren't using context management commands. Long sessions accumulate stale context that causes Claude to repeat mistakes or forget earlier decisions. Try: '/compact focus on the current bug — drop the earlier architecture discussion'.",
+    (
+        "D1",
+        3,
+    ): "You're using /compact but without focus instructions, so irrelevant context stays alive. When switching tasks mid-session, use '/clear' to fully reset, or '/compact only keep the changes made to auth.py and the current error'.",
+    (
+        "D1",
+        4,
+    ): "Front-load all file reads before making changes in long sessions. Use @filename references instead of pasting content inline. When a session exceeds ~50 turns, split into a new session with a fresh summary prompt.",
+    (
+        "D2",
+        2,
+    ): "You're diving into implementation without an explicit plan. For tasks touching 3+ files, list the changes upfront first. Try: 'Before coding, list every file we'll need to change and what changes each needs. Don't start implementing yet.'",
+    (
+        "D2",
+        3,
+    ): "Use Plan Mode for complex tasks — it forces Claude to show its reasoning before touching code. Say: 'Enter plan mode and propose an implementation strategy. Don't write any code yet.' This catches wrong approaches before they cost turns.",
+    (
+        "D2",
+        4,
+    ): "Use the Task tool to run independent subtasks in parallel. Spin one agent to research the API, another to set up the test scaffold, while you review the plan — this can cut multi-hour sessions to minutes.",
+    (
+        "D3",
+        2,
+    ): "Your initial prompts often lack the specifics Claude needs to avoid correction loops. Include: the exact file path, the full error message, and what 'done' looks like. 'Fix the bug' → 'The test in auth_test.py:47 fails with KeyError: user_id — fix the implementation, not the test'.",
+    (
+        "D3",
+        3,
+    ): "Add explicit constraints upfront to prevent Claude going in the wrong direction. Before starting: 'Do not change the public API. Existing tests must still pass. Only modify the implementation inside _process_batch().' This prevents the most common correction loops.",
+    (
+        "D3",
+        4,
+    ): "For hard problems, activate extended reasoning: 'Think step by step before proposing a solution. Consider edge cases around concurrent writes and what happens if the queue is empty.' Front-loading analysis reduces back-and-forth on missed cases.",
+    (
+        "D4",
+        2,
+    ): "No CLAUDE.md detected. This file encodes your conventions so Claude doesn't need to be told them every session. Run '/init' to generate a starter, then customize it with your real preferences — test commands, style rules, things Claude should never do.",
+    (
+        "D5",
+        2,
+    ): "High Bash usage for file operations suggests underuse of Claude's built-in tools. Use Read/Edit/Grep/Glob directly — they're faster, have better error messages, and don't require shell quoting. Reserve Bash for running tests, builds, and CLI tools.",
+    (
+        "D5",
+        3,
+    ): "Use the Task tool for parallel research. Instead of blocking on 'find all usages of this function', spawn a Task agent for the search while you continue with the main work: 'Use the Task tool to search the codebase for X in the background'.",
+    (
+        "D6",
+        2,
+    ): "Sessions show file edits without test runs. Always end implementation prompts with: 'After making changes, run the test suite and show me the output. If any tests fail, fix them before presenting the result as done.'",
+    (
+        "D6",
+        3,
+    ): "Adopt test-first ordering: ask Claude to run the failing test first to confirm the failure, then fix the implementation. 'First run pytest test_auth.py::test_login -v to show the failure, then fix the code until it passes.'",
+    (
+        "D6",
+        4,
+    ): "After fixing a bug, habitually add: 'Now add a regression test that would have caught this bug.' Use /commit to create atomic checkpoints after each working change so you can safely revert.",
+    (
+        "D7",
+        2,
+    ): "Sessions have file changes but no commits. Use /commit to let Claude write commit messages from the diff — it's faster and produces better messages. Commit frequently to create safe rollback points.",
+    (
+        "D7",
+        3,
+    ): "Let Claude create PRs: 'Create a PR for these changes with a description of what was fixed and why.' Claude reads the diff and writes context-aware PR descriptions better than most humans.",
+    (
+        "D8",
+        2,
+    ): "Debug prompts are missing the full error context. Always paste the complete stack trace — not just the last line. The specific file, line number, and exception type often contain the answer. 'Here's the full traceback: [paste]. What's the root cause?'",
+    (
+        "D8",
+        3,
+    ): "When Claude fixes symptoms instead of causes, say: 'Don't change any code yet — trace this error back to its root cause and explain why it's happening.' This prevents multi-turn cycles chasing the same underlying bug.",
+    (
+        "D8",
+        4,
+    ): "After fixing a recurring bug: 'Add a regression test that would have caught this. Commit the fix separately from the test so the history is clean.' This creates both a safety net and useful git history.",
+    (
+        "D9",
+        2,
+    ): "Long sessions with unrelated tasks cause Claude to lose focus and mix up context between subtasks. Start a new Claude session for each distinct goal — sessions under 20 turns with a single task have significantly higher productivity.",
+    (
+        "D9",
+        3,
+    ): "Use --continue to resume your last session, or --resume [session-id] for a specific conversation. For interrupted multi-step work, start with: 'Summarize what we completed last session and what's still left to do.'",
+    (
+        "D9",
+        4,
+    ): "Run independent tasks in parallel Claude sessions. While one session is testing/building, start another for the next feature. Use background agents for CI-style workflows: 'Run this full test suite in the background and notify me when done.'",
 }

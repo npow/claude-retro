@@ -19,7 +19,9 @@ def get_version_info() -> dict:
 
     try:
         version = (
-            subprocess.check_output(["git", "describe", "--tags", "--always", "--dirty"])
+            subprocess.check_output(
+                ["git", "describe", "--tags", "--always", "--dirty"]
+            )
             .decode()
             .strip()
         )

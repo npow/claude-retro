@@ -57,14 +57,19 @@ def generate_export_html() -> str:
     avg_turns = round(stats[5] or 0, 1)
 
     # Productivity calculation
-    productivity = round(max(0, min(100, (avg_convergence * 100) - (avg_drift * 50) - (avg_thrash * 30))), 1)
+    productivity = round(
+        max(
+            0, min(100, (avg_convergence * 100) - (avg_drift * 50) - (avg_thrash * 30))
+        ),
+        1,
+    )
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude Retro Export - {datetime.now().strftime('%Y-%m-%d')}</title>
+<title>Claude Retro Export - {datetime.now().strftime("%Y-%m-%d")}</title>
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{
@@ -118,7 +123,7 @@ h2 {{ font-size: 20px; margin: 30px 0 15px; color: #8b8fa3; }}
 <body>
 <div class="container">
   <h1>Claude Retro Export</h1>
-  <p style="color: #8b8fa3; margin-bottom: 30px;">Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+  <p style="color: #8b8fa3; margin-bottom: 30px;">Generated on {datetime.now().strftime("%B %d, %Y at %I:%M %p")}</p>
 
   <div class="verdict">
     <h2>The Verdict</h2>
@@ -171,14 +176,16 @@ h2 {{ font-size: 20px; margin: 30px 0 15px; color: #8b8fa3; }}
 
     # Add sessions
     for s in top_sessions:
-        session_id = s[0]
         project = html.escape(s[1] or "")
         from datetime import datetime as _dt
+
         try:
-            date = _dt.fromisoformat(s[2]).strftime('%b %d, %Y') if s[2] else ""
+            date = _dt.fromisoformat(s[2]).strftime("%b %d, %Y") if s[2] else ""
         except (ValueError, TypeError):
             date = (s[2] or "")[:10]
-        prompt = html.escape((s[3] or "")[:150] + "..." if s[3] and len(s[3]) > 150 else s[3] or "")
+        prompt = html.escape(
+            (s[3] or "")[:150] + "..." if s[3] and len(s[3]) > 150 else s[3] or ""
+        )
         outcome = html.escape(s[4] or "unknown")
         confidence = round((s[5] or 0) * 100, 0)
 

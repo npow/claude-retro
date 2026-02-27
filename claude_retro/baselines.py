@@ -1,7 +1,7 @@
 """Rolling 14/60 session window baselines."""
 
 from .config import BASELINE_WINDOWS
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def compute_baselines():
@@ -48,26 +48,26 @@ def compute_baselines():
                 )
 
                 conn.execute(
-                        """
+                    """
                         INSERT INTO baselines (id, window_size, computed_at,
                             avg_convergence, avg_drift, avg_thrash,
                             avg_duration, avg_turns, avg_tool_errors,
                             avg_correction_rate, session_count)
                         VALUES (?, ?, current_timestamp, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                        [
-                            window_size,
-                            window_size,
-                            result[0],
-                            result[1],
-                            result[2],
-                            result[3],
-                            result[4],
-                            result[5],
-                            avg_correction,
-                            result[6],
-                        ],
-                    )
+                    [
+                        window_size,
+                        window_size,
+                        result[0],
+                        result[1],
+                        result[2],
+                        result[3],
+                        result[4],
+                        result[5],
+                        avg_correction,
+                        result[6],
+                    ],
+                )
 
         conn.commit()
     except Exception:

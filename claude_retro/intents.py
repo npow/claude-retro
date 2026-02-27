@@ -1,7 +1,7 @@
 """Heuristic intent classification."""
 
 from .config import INTENT_KEYWORDS
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def classify_intent(first_prompt: str, tool_ratios: dict) -> str:
@@ -59,7 +59,8 @@ def classify_all_intents():
             }
             intent = classify_intent(first_prompt or "", tool_ratios)
             conn.execute(
-                "UPDATE sessions SET intent = ? WHERE session_id = ?", [intent, session_id]
+                "UPDATE sessions SET intent = ? WHERE session_id = ?",
+                [intent, session_id],
             )
 
         conn.commit()

@@ -88,7 +88,7 @@ def main():
         try:
             count = conn.execute("SELECT COUNT(*) FROM raw_entries").fetchone()[0]
             needs_ingest = count == 0
-        except:
+        except Exception:
             needs_ingest = True
         if needs_ingest:
             print("No data found. Ingesting in background...")

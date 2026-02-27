@@ -6,7 +6,7 @@ from .config import (
     THRASH_WEIGHTS,
     TRAJECTORY_THRESHOLDS,
 )
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def _clamp(v: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -52,7 +52,7 @@ def compute_scores():
             ) = row
 
             # --- Convergence ---
-        # prompt_length_decrease: negative trend is good
+            # prompt_length_decrease: negative trend is good
             c_prompt = _clamp(max(0, -prompt_trend) / 0.5)
             # decision_markers: more is better (normalize by prompt count)
             c_decisions = _clamp(decisions / max(prompt_count, 1) / 0.5)

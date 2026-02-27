@@ -8,7 +8,7 @@ from .config import (
     DECISION_MARKERS,
     TOOL_CATEGORIES,
 )
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def _linear_trend(values: list[float]) -> float:
@@ -268,7 +268,7 @@ def _extract_session_features(session_id: str, conn):
         from datetime import datetime, timezone
 
         # Parse ISO timestamp string from SQLite
-        started_utc = datetime.fromisoformat(session_info[0].replace('Z', '+00:00'))
+        started_utc = datetime.fromisoformat(session_info[0].replace("Z", "+00:00"))
         if started_utc.tzinfo is None:
             started_utc = started_utc.replace(tzinfo=timezone.utc)
         started_local = started_utc.astimezone()

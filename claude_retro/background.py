@@ -49,7 +49,10 @@ class IngestionWorker(threading.Thread):
     def request_fill_narratives(self, concurrency: int = 12):
         """Request a fill-narratives pass: re-judge sessions missing narrative text."""
         with self._refresh_lock:
-            self._refresh_request = {"concurrency": concurrency, "fill_narratives": True}
+            self._refresh_request = {
+                "concurrency": concurrency,
+                "fill_narratives": True,
+            }
 
     @property
     def is_busy(self) -> bool:
@@ -161,6 +164,7 @@ class IngestionWorker(threading.Thread):
         generate_prescriptions()
         self._set_status("Building search index", 10, n)
         from .db import rebuild_fts_index
+
         rebuild_fts_index()
         self._set_idle()
 
@@ -238,6 +242,7 @@ class IngestionWorker(threading.Thread):
         if judged > 0:
             from .baselines import compute_baselines
             from .prescriptions import generate_prescriptions
+
             self._set_status("Recomputing baselines", 1, 2)
             compute_baselines()
             self._set_status("Regenerating prescriptions", 2, 2)

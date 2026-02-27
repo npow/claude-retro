@@ -1,6 +1,6 @@
 """Populate sessions table from raw_entries."""
 
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def build_sessions():

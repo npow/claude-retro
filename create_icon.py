@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Generate a macOS .icns icon for Claude Retro."""
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import os
 import shutil
 import subprocess
 
+
 def create_icon(size):
     """Create icon at specified size with Claude Retro branding."""
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     # Claude brand colors - deep purple/blue gradient
@@ -28,8 +29,7 @@ def create_icon(size):
         g = int(dark_purple[1] + (purple[1] - dark_purple[1]) * ratio)
         b = int(dark_purple[2] + (purple[2] - dark_purple[2]) * ratio)
         draw.ellipse(
-            [center - i, center - i, center + i, center + i],
-            fill=(r, g, b, alpha)
+            [center - i, center - i, center + i, center + i], fill=(r, g, b, alpha)
         )
 
     # Draw retrospective chart elements - ascending bars
@@ -49,17 +49,11 @@ def create_icon(size):
         y = base_y - bar_height
 
         # Draw bar with accent color
-        draw.rectangle(
-            [x, y, x + bar_width, base_y],
-            fill=accent
-        )
+        draw.rectangle([x, y, x + bar_width, base_y], fill=accent)
 
         # Add slight highlight on left edge
         if bar_width > 3:
-            draw.rectangle(
-                [x, y, x + 1, base_y],
-                fill=(150, 240, 200)
-            )
+            draw.rectangle([x, y, x + 1, base_y], fill=(150, 240, 200))
 
     # Draw circular arrow (retrospective/cycle symbol)
     arrow_radius = int(size * 0.35)
@@ -70,7 +64,7 @@ def create_icon(size):
         center - arrow_radius,
         center - arrow_radius,
         center + arrow_radius,
-        center + arrow_radius
+        center + arrow_radius,
     ]
     draw.arc(bbox, start=45, end=315, fill=(255, 255, 255, 200), width=arrow_width)
 
@@ -81,18 +75,19 @@ def create_icon(size):
     arrow_points = [
         (arrow_x, arrow_y),
         (arrow_x + arrow_size, arrow_y - arrow_size // 2),
-        (arrow_x + arrow_size, arrow_y + arrow_size // 2)
+        (arrow_x + arrow_size, arrow_y + arrow_size // 2),
     ]
     draw.polygon(arrow_points, fill=(255, 255, 255, 200))
 
     return img
 
-def create_icns(output_path='icon.icns'):
+
+def create_icns(output_path="icon.icns"):
     """Create macOS .icns file with all required sizes."""
     sizes = [16, 32, 64, 128, 256, 512, 1024]
 
     # Create iconset directory
-    iconset_dir = 'icon.iconset'
+    iconset_dir = "icon.iconset"
     if os.path.exists(iconset_dir):
         shutil.rmtree(iconset_dir)
     os.makedirs(iconset_dir)
@@ -102,19 +97,19 @@ def create_icns(output_path='icon.icns'):
         img = create_icon(size)
 
         # Save normal resolution
-        img.save(f'{iconset_dir}/icon_{size}x{size}.png')
+        img.save(f"{iconset_dir}/icon_{size}x{size}.png")
 
         # Save @2x resolution (except for largest size)
         if size <= 512:
             img_2x = create_icon(size * 2)
-            img_2x.save(f'{iconset_dir}/icon_{size}x{size}@2x.png')
+            img_2x.save(f"{iconset_dir}/icon_{size}x{size}@2x.png")
 
     print("Converting to .icns...")
     # Convert to .icns using iconutil
     result = subprocess.run(
-        ['iconutil', '-c', 'icns', iconset_dir, '-o', output_path],
+        ["iconutil", "-c", "icns", iconset_dir, "-o", output_path],
         capture_output=True,
-        text=True
+        text=True,
     )
 
     if result.returncode != 0:
@@ -127,8 +122,9 @@ def create_icns(output_path='icon.icns'):
     print(f"✓ Created {output_path}")
     return True
 
-if __name__ == '__main__':
-    create_icns('icon.icns')
+
+if __name__ == "__main__":
+    create_icns("icon.icns")
     print("\nTo use this icon, update claude_retro.spec:")
     print("  icon='icon.icns',")
     print("\nThen rebuild with: ./build_macos.sh")

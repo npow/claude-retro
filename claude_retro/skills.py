@@ -13,7 +13,7 @@ from .config import (
     SKILL_TEST_COMMANDS,
     SKILL_THINKING_TRIGGERS,
 )
-from .db import get_conn, get_writer
+from .db import get_writer
 
 
 def assess_skills() -> int:
@@ -73,9 +73,26 @@ def _assess_session(session_id: str, conn):
     """,
         [
             session_id,
-            d1[0], d1[1], d2[0], d2[1], d3[0], d3[1], d4[0], d4[1],
-            d5[0], d5[1], d6[0], d6[1], d7[0], d7[1], d8[0], d8[1],
-            d9[0], d9[1], d10[0], d10[1],
+            d1[0],
+            d1[1],
+            d2[0],
+            d2[1],
+            d3[0],
+            d3[1],
+            d4[0],
+            d4[1],
+            d5[0],
+            d5[1],
+            d6[0],
+            d6[1],
+            d7[0],
+            d7[1],
+            d8[0],
+            d8[1],
+            d9[0],
+            d9[1],
+            d10[0],
+            d10[1],
             confidence,
             None,  # assessed_at uses DEFAULT
         ],
@@ -352,11 +369,28 @@ def _detect_tool_leverage(data: dict) -> tuple[int, int]:
     task_ratio = feat.get("task_ratio", 0)
     # Standard Claude Code tools — anything not in this set is likely MCP/custom
     _STANDARD_TOOLS = {
-        "Edit", "Write", "Read", "Grep", "Glob", "Bash", "Task",
-        "WebFetch", "WebSearch", "NotebookEdit", "AskUserQuestion",
-        "EnterPlanMode", "ExitPlanMode", "Skill",
-        "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "TaskOutput",
-        "TaskStop", "ListMcpResourcesTool", "ReadMcpResourceTool",
+        "Edit",
+        "Write",
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Task",
+        "WebFetch",
+        "WebSearch",
+        "NotebookEdit",
+        "AskUserQuestion",
+        "EnterPlanMode",
+        "ExitPlanMode",
+        "Skill",
+        "TaskCreate",
+        "TaskUpdate",
+        "TaskList",
+        "TaskGet",
+        "TaskOutput",
+        "TaskStop",
+        "ListMcpResourcesTool",
+        "ReadMcpResourceTool",
     }
     has_mcp = any(
         t.startswith("mcp__") or (t not in _STANDARD_TOOLS and not t.startswith("Task"))
@@ -382,7 +416,6 @@ def _detect_tool_leverage(data: dict) -> tuple[int, int]:
 def _detect_verification(data: dict) -> tuple[int, int]:
     """D6: Verification & QA."""
     texts = data["user_texts"]
-    tool_usage = data["tool_usage"]
     tool_seq = data["tool_sequence"]
     feat = data["features"]
     level = 1
@@ -391,9 +424,9 @@ def _detect_verification(data: dict) -> tuple[int, int]:
     # Check for test commands in Bash tool calls or user prompts
     all_texts = texts + [data["first_prompt"]]
     has_test_mention = _has_any(all_texts, SKILL_TEST_COMMANDS)
-    has_test_run = _has_any(all_texts, ["run the test", "run tests", "npm test", "pytest"])
-    bash_uses = tool_usage.get("Bash", {}).get("use_count", 0)
-
+    has_test_run = _has_any(
+        all_texts, ["run the test", "run tests", "npm test", "pytest"]
+    )
     # Detect test-first ordering: only counts if we ALSO have test signal
     # (Bash alone before Edit is not test-first — could be mkdir, git, etc.)
     test_first = False
@@ -427,7 +460,6 @@ def _detect_git_workflow(data: dict) -> tuple[int, int]:
     """D7: Git & Collaboration Workflow."""
     texts = data["user_texts"]
     feat = data["features"]
-    tool_names = data["tool_names"]
     level = 1
     opportunity = 0
 
@@ -435,7 +467,6 @@ def _detect_git_workflow(data: dict) -> tuple[int, int]:
     has_gh = _has_any(texts, ["gh pr", "gh issue"])
     has_pr = feat.get("has_pr_link", False)
     has_worktree = _has_any(texts, ["git worktree", "worktree"])
-    branch_switches = feat.get("branch_switch_count", 0)
 
     if has_commit:
         level = 2
@@ -455,7 +486,6 @@ def _detect_error_recovery(data: dict) -> tuple[int, int]:
     """D8: Error Recovery & Debugging."""
     texts = data["user_texts"]
     feat = data["features"]
-    j = data["judgment"]
     level = 1
     opportunity = 0
 
@@ -463,7 +493,9 @@ def _detect_error_recovery(data: dict) -> tuple[int, int]:
         texts, ["stack trace", "traceback", "error:", "Error:", "exception"]
     )
     has_root_cause = _has_any(texts, SKILL_ROOT_CAUSE)
-    has_checkpoint = _has_any(texts, ["checkpoint", "git stash", "save state", "rewind"])
+    has_checkpoint = _has_any(
+        texts, ["checkpoint", "git stash", "save state", "rewind"]
+    )
     correction_count = feat.get("correction_count", 0)
 
     if has_error_context:
@@ -495,8 +527,14 @@ def _detect_session_strategy(data: dict) -> tuple[int, int]:
     has_resume = _has_any(texts, SKILL_SESSION_RESUME)
     has_background = _has_any(
         texts,
-        ["background agent", "run in background", "parallel session",
-         "multiple sessions", "headless", "run_in_background"],
+        [
+            "background agent",
+            "run in background",
+            "parallel session",
+            "multiple sessions",
+            "headless",
+            "run_in_background",
+        ],
     )
 
     if duration < 1800 and turn_count <= 20:
@@ -543,7 +581,7 @@ def _compute_skill_profile(conn):
     # Exponential decay weights (most recent = highest weight)
     n = len(rows)
     decay = 0.95
-    weights = [decay ** i for i in range(n)]
+    weights = [decay**i for i in range(n)]
     total_weight = sum(weights)
 
     # Compute weighted average for each dimension
@@ -556,9 +594,7 @@ def _compute_skill_profile(conn):
         level_idx = cols.index(level_col)
         opp_idx = cols.index(opp_col)
 
-        weighted_level = sum(
-            (rows[i][level_idx] or 0) * weights[i] for i in range(n)
-        )
+        weighted_level = sum((rows[i][level_idx] or 0) * weights[i] for i in range(n))
         scores[dim_id] = weighted_level / total_weight if total_weight > 0 else 0
 
     # Identify top 3 gaps (largest opportunity - demonstrated delta)
@@ -573,7 +609,9 @@ def _compute_skill_profile(conn):
 
         # Average opportunity and level across recent sessions
         recent = rows[:20]  # focus on last 20 for gap detection
-        avg_level = sum((r[level_idx] or 0) for r in recent) / len(recent) if recent else 0
+        avg_level = (
+            sum((r[level_idx] or 0) for r in recent) / len(recent) if recent else 0
+        )
         avg_opp = sum((r[opp_idx] or 0) for r in recent) / len(recent) if recent else 0
 
         gap = avg_opp - avg_level

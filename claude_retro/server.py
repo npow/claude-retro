@@ -1,6 +1,7 @@
 """Flask REST API."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -417,11 +418,39 @@ _FRICTION_PATTERNS = [
 ]
 
 
+def _check_llm_reachable_cached():
+    """Return (reachable: bool, url: str) with a 60s cache to avoid hammering the relay."""
+    import time
+    import urllib.request
+
+    now = time.monotonic()
+    cache = getattr(_check_llm_reachable_cached, "_cache", None)
+    if cache and now - cache["ts"] < 60:
+        return cache["ok"], cache["url"]
+
+    from .llm_judge import _DEFAULT_BASE_URL
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", _DEFAULT_BASE_URL)
+    # Don't check the real Anthropic API — it's always reachable if key is valid
+    if "localhost" not in base_url and "127.0.0.1" not in base_url:
+        result = (True, base_url)
+    else:
+        try:
+            urllib.request.urlopen(base_url.rstrip("/") + "/", timeout=2)
+            result = (True, base_url)
+        except Exception:
+            result = (False, base_url)
+
+    _check_llm_reachable_cached._cache = {"ok": result[0], "url": result[1], "ts": now}
+    return result
+
+
 @app.route("/api/status")
 def api_status():
-    if _worker is None:
-        return jsonify({"state": "idle", "step": "", "ready": True})
-    return jsonify(_worker.status)
+    status = dict(_worker.status) if _worker is not None else {"state": "idle", "step": "", "ready": True, "last_error": None, "last_judged": 0}
+    llm_ok, llm_url = _check_llm_reachable_cached()
+    status["llm_reachable"] = llm_ok
+    status["llm_url"] = llm_url
+    return jsonify(status)
 
 
 def _row_to_dict(row, columns):
@@ -442,6 +471,60 @@ def index():
 @app.route("/api/version")
 def api_version():
     return jsonify(get_version_info())
+
+
+@app.route("/api/diagnose")
+def api_diagnose():
+    """Self-diagnosis endpoint: returns useful debug info without needing server logs."""
+    import os
+    from .db import get_conn
+    from .llm_judge import _DEFAULT_BASE_URL, _DEFAULT_MODEL
+    from .config import CLAUDE_PROJECTS_DIR
+
+    conn = get_conn()
+    diag = {}
+
+    # LLM relay reachability
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", _DEFAULT_BASE_URL)
+    model = os.environ.get("CLAUDE_RETRO_MODEL", _DEFAULT_MODEL)
+    diag["llm_base_url"] = base_url
+    diag["llm_model"] = model
+    try:
+        import urllib.request
+        urllib.request.urlopen(base_url.rstrip("/") + "/", timeout=2)
+        diag["llm_reachable"] = True
+    except Exception as e:
+        diag["llm_reachable"] = False
+        diag["llm_error"] = str(e)
+
+    # DB counts
+    try:
+        diag["sessions_total"] = conn.execute("SELECT COUNT(*) FROM sessions WHERE turn_count >= 1").fetchone()[0]
+        diag["sessions_judged"] = conn.execute("SELECT COUNT(*) FROM session_judgments j JOIN sessions s ON j.session_id = s.session_id WHERE s.turn_count >= 1").fetchone()[0]
+        diag["sessions_unjudged"] = diag["sessions_total"] - diag["sessions_judged"]
+        diag["sessions_without_narrative"] = conn.execute(
+            "SELECT COUNT(*) FROM session_judgments WHERE narrative IS NULL OR narrative = ''"
+        ).fetchone()[0]
+    except Exception as e:
+        diag["db_error"] = str(e)
+
+    # Worker state
+    if _worker is not None:
+        diag["worker_state"] = _worker.status.get("state")
+        diag["worker_last_error"] = _worker.status.get("last_error")
+        diag["worker_last_judged"] = _worker.status.get("last_judged")
+    else:
+        diag["worker_state"] = "no worker"
+
+    # JSONL file count
+    try:
+        jsonl_count = sum(1 for root, _, files in os.walk(CLAUDE_PROJECTS_DIR) for f in files if f.endswith(".jsonl"))
+        diag["jsonl_files"] = jsonl_count
+        diag["projects_dir"] = str(CLAUDE_PROJECTS_DIR)
+    except Exception as e:
+        diag["jsonl_error"] = str(e)
+
+    return jsonify(diag)
 
 
 @app.route("/api/export")

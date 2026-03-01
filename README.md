@@ -104,12 +104,14 @@ Opens in your browser at `localhost:8420` (or the next free port if 8420 is busy
 |----------|---------|-------------|
 | `CLAUDE_RETRO_DB` | `~/.claude/retro.sqlite` | Database path |
 | `CLAUDE_RETRO_PORT` | `8420` | Preferred server port (falls back if busy) |
-| `CLAUDE_RETRO_RELAY_PORT` | `18082` | Relay service port used by `claude-retro setup` |
+| `CLAUDE_RETRO_RELAY_PORT` | `8082` | Port for the auto-started `claude-relay` |
+| `ANTHROPIC_BASE_URL` | *(auto)* | Override LLM endpoint (e.g. `https://api.anthropic.com`) |
+| `ANTHROPIC_API_KEY` | `unused` | API key (only needed when using the real Anthropic API) |
 
 ## Requirements
 
 - Python 3.10+
-- `claude` CLI on PATH (for LLM judging)
+- `claude` CLI on PATH (for LLM judging via the bundled `claude-relay`)
 
 ## Architecture
 

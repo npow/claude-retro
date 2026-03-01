@@ -1124,6 +1124,13 @@ tr:hover td { background: var(--surface2); }
     <div id="refresh-bar" style="position:absolute;bottom:-1px;left:0;height:2px;width:0%;background:var(--accent);transition:width 0.3s"></div>
   </div>
 
+  <!-- LLM relay warning banner (shown when relay is unreachable) -->
+  <div id="llm-warn-banner" style="display:none;background:color-mix(in srgb,#f97316 12%,var(--surface));border-bottom:1px solid #f9731640;padding:8px 16px;font-size:12px;color:#f97316;align-items:center;gap:8px">
+    <span>⚠</span>
+    <span id="llm-warn-text">LLM relay unreachable — "Run LLM Judge" will not work.</span>
+    <a href="/api/diagnose" target="_blank" style="color:#f97316;text-decoration:underline;margin-left:4px">diagnose</a>
+  </div>
+
   <!-- 1. THE VERDICT -->
   <div class="verdict" id="verdict">
     <!-- Content loaded by JS -->
@@ -4165,6 +4172,18 @@ async function updateBackgroundStatus(status) {
   const countEl = document.getElementById('refresh-count');
   const barEl = document.getElementById('refresh-bar');
   const btn = document.getElementById('refresh-btn');
+  const warnBanner = document.getElementById('llm-warn-banner');
+
+  // Show/hide LLM relay warning banner
+  if (warnBanner) {
+    if (status.llm_reachable === false) {
+      document.getElementById('llm-warn-text').textContent =
+        `LLM relay unreachable at ${status.llm_url || 'localhost'} — "Run LLM Judge" will fail. Set ANTHROPIC_API_KEY or run claude-relay.`;
+      warnBanner.style.display = 'flex';
+    } else if (status.llm_reachable === true) {
+      warnBanner.style.display = 'none';
+    }
+  }
 
   const currentState = status.ready ? 'idle' : status.state;
 
@@ -4211,17 +4230,27 @@ async function updateBackgroundStatus(status) {
 
     // If we just transitioned from working to idle, reload data
     if (lastSeenState !== null && lastSeenState !== 'idle' && currentState === 'idle') {
-      stepEl.textContent = 'Complete!';
-      barEl.style.width = '100%';
-      countEl.textContent = '';
+      if (status.last_error) {
+        stepEl.innerHTML = `Error: ${esc(status.last_error)} — <a href="/api/diagnose" target="_blank" style="color:var(--accent);text-decoration:underline">diagnose</a>`;
+        stepEl.style.color = 'var(--red)';
+        barEl.style.width = '0%';
+        countEl.textContent = '';
+        setTimeout(() => { progressEl.style.display = 'none'; stepEl.style.color = ''; stepEl.textContent = ''; }, 12000);
+      } else {
+        const judged = status.last_judged || 0;
+        stepEl.style.color = '';
+        stepEl.textContent = judged > 0 ? `Complete! Judged ${judged} session${judged !== 1 ? 's' : ''}.` : 'Complete! (all sessions already judged)';
+        barEl.style.width = '100%';
+        countEl.textContent = '';
 
-      await Promise.all([loadVerdict(), loadChangeCards(), loadSynthesis(), loadHighlights(), loadLostHours(), loadGroundhogDay(), loadFrictionMap()]);
-      expandedSessionId = null;
-      await loadSessions(false);
-      _chartsLoaded = false;
-      await Promise.all([loadProjectHealth(), loadSkills(), loadFrictionCategories()]);
+        await Promise.all([loadVerdict(), loadChangeCards(), loadSynthesis(), loadHighlights(), loadLostHours(), loadGroundhogDay(), loadFrictionMap()]);
+        expandedSessionId = null;
+        await loadSessions(false);
+        _chartsLoaded = false;
+        await Promise.all([loadProjectHealth(), loadSkills(), loadFrictionCategories()]);
 
-      setTimeout(() => { progressEl.style.display = 'none'; }, 2000);
+        setTimeout(() => { progressEl.style.display = 'none'; }, 2000);
+      }
     } else {
       // Worker was already idle - hide progress immediately (avoid unnecessary repaints)
       if (progressEl.style.display !== 'none') {

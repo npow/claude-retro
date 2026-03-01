@@ -1,6 +1,69 @@
 """CLI entry point: app, serve, ingest, digest, reset."""
 
+import os
 import sys
+
+
+def _ensure_relay(port: int = 8082) -> bool:
+    """Start claude-relay if it isn't already listening on the given port.
+
+    Returns True if the relay is ready (was already running or we started it),
+    False if we couldn't start it (degrade gracefully — LLM judging just won't work).
+    """
+    import shutil
+    import socket
+    import subprocess
+    import time
+
+    def _is_port_open(p: int) -> bool:
+        try:
+            with socket.create_connection(("127.0.0.1", p), timeout=1):
+                return True
+        except OSError:
+            return False
+
+    if _is_port_open(port):
+        print(f"  claude-relay already running on port {port}")
+        return True
+
+    relay_bin = shutil.which("claude-relay")
+    if not relay_bin:
+        print("  Warning: claude-relay not found on PATH — LLM Judge will not work.")
+        return False
+
+    # Don't start relay inside a Claude Code session (would fail with nested session error)
+    if os.environ.get("CLAUDECODE"):
+        print(f"  Skipping claude-relay auto-start (running inside Claude Code session).")
+        print(f"  To enable LLM Judge, run: claude-relay serve --port {port}")
+        return False
+
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    print(f"  Starting claude-relay on port {port}...")
+    try:
+        proc = subprocess.Popen(
+            [relay_bin, "serve", "--port", str(port)],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,  # detach so it survives if this process dies
+        )
+    except Exception as e:
+        print(f"  Warning: failed to start claude-relay: {e}")
+        return False
+
+    # Wait up to 8 seconds for the relay to become ready
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        if _is_port_open(port):
+            print(f"  claude-relay ready (pid {proc.pid})")
+            return True
+        if proc.poll() is not None:
+            print(f"  Warning: claude-relay exited (code {proc.returncode}) — LLM Judge will not work.")
+            return False
+        time.sleep(0.25)
+
+    print(f"  Warning: claude-relay didn't become ready in time — LLM Judge may not work.")
+    return False
 
 
 def main():
@@ -72,6 +135,14 @@ def main():
         from .port_select import choose_server_port
         from .server import app, set_worker
         from .background import IngestionWorker
+
+        # Start claude-relay for LLM judging (unless user has their own LLM setup)
+        if not os.environ.get("ANTHROPIC_BASE_URL"):
+            relay_port = int(os.environ.get("CLAUDE_RETRO_RELAY_PORT", 8082))
+            print("Checking LLM relay...")
+            _ensure_relay(port=relay_port)
+            # Point the LLM judge at the relay we just started
+            os.environ.setdefault("ANTHROPIC_BASE_URL", f"http://localhost:{relay_port}")
 
         # Check if DB is empty — worker will run pipeline immediately
         from .db import get_conn, get_writer

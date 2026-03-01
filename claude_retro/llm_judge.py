@@ -523,6 +523,27 @@ def judge_session(session_id: str, conn) -> dict:
     return record
 
 
+def _check_llm_reachable():
+    """Raise a user-friendly RuntimeError if the LLM endpoint is unreachable."""
+    import urllib.request
+    import urllib.error
+
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", _DEFAULT_BASE_URL)
+    # Only pre-check for local relay URLs — the real Anthropic API doesn't need this
+    if "localhost" not in base_url and "127.0.0.1" not in base_url:
+        return
+    try:
+        urllib.request.urlopen(base_url.rstrip("/") + "/", timeout=3)
+    except Exception:
+        raise RuntimeError(
+            f"Cannot reach LLM relay at {base_url}. "
+            "To use the LLM Judge you need either:\n"
+            "  1. Run claude-relay (install with: pip install claude-relay && claude-relay serve)\n"
+            "  2. Set ANTHROPIC_BASE_URL=https://api.anthropic.com and ANTHROPIC_API_KEY=sk-ant-...\n"
+            f"  Current base URL: {base_url}"
+        )
+
+
 def judge_sessions(
     force: bool = False,
     concurrency: int = CONCURRENCY,
@@ -539,6 +560,8 @@ def judge_sessions(
     fill_narratives=True: only re-judge sessions that have a judgment but no narrative.
     """
     from .db import get_writer
+
+    _check_llm_reachable()  # Fail fast with a friendly error if LLM is unreachable
 
     conn = get_conn()  # reader for SELECT queries
     wconn = get_writer()  # writer for INSERT/DELETE
@@ -647,6 +670,20 @@ def judge_sessions(
                 progress_callback(done, total, count, errors)
             if done % 10 == 0 or done == total:
                 print(f"  Progress: {done}/{total} ({count} ok, {errors} errors)")
+
+    # If every single session errored, raise so the background worker can surface it
+    if errors > 0 and count == 0:
+        # Grab the last error from the futures for a useful message
+        last_exc = None
+        for future in futures:
+            result_val = future.result()[1]
+            if isinstance(result_val, Exception):
+                last_exc = result_val
+        msg = str(last_exc) if last_exc else "all sessions failed"
+        # Provide a friendlier hint for the common "can't reach LLM" case
+        if "connection" in msg.lower() or "refused" in msg.lower() or "8082" in msg:
+            msg = f"Cannot reach LLM relay at {os.environ.get('ANTHROPIC_BASE_URL', _DEFAULT_BASE_URL)} — is it running? ({msg})"
+        raise RuntimeError(f"LLM judging failed for all {errors} session(s): {msg}")
 
     # Generate cross-session synthesis after judging (always, even if all errored)
     try:

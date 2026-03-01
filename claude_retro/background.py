@@ -31,6 +31,8 @@ class IngestionWorker(threading.Thread):
             "ready": True,
             "current": 0,
             "total": 0,
+            "last_error": None,
+            "last_judged": 0,
         }
         self._refresh_request: dict | None = None
         self._refresh_lock = threading.Lock()
@@ -64,7 +66,7 @@ class IngestionWorker(threading.Thread):
                 self._run_pipeline()
             except Exception:
                 traceback.print_exc()
-                self._set_idle()
+                self._set_error(traceback.format_exc())
 
         while not self._stop_event.is_set():
             try:
@@ -85,7 +87,7 @@ class IngestionWorker(threading.Thread):
                     self._run_pipeline()
             except Exception:
                 traceback.print_exc()
-                self._set_idle()
+                self._set_error(traceback.format_exc())
             self._stop_event.wait(self.interval)
 
     def _has_changes(self) -> bool:
@@ -121,15 +123,36 @@ class IngestionWorker(threading.Thread):
             "ready": False,
             "current": current,
             "total": total,
+            "last_error": None,
+            "last_judged": self.status.get("last_judged", 0),
         }
 
-    def _set_idle(self):
+    def _set_idle(self, judged: int = 0):
         self.status = {
             "state": "idle",
             "step": "",
             "ready": True,
             "current": 0,
             "total": 0,
+            "last_error": self.status.get("last_error"),
+            "last_judged": judged,
+        }
+
+    def _set_error(self, error: str):
+        # Use the last non-empty line (usually the exception message) as the short message
+        lines = [l for l in error.strip().splitlines() if l.strip()]
+        msg = lines[-1].strip() if lines else error[:300]
+        # Cap at 300 chars so it fits in the UI
+        if len(msg) > 300:
+            msg = msg[:297] + "..."
+        self.status = {
+            "state": "idle",
+            "step": "",
+            "ready": True,
+            "current": 0,
+            "total": 0,
+            "last_error": msg,
+            "last_judged": self.status.get("last_judged", 0),
         }
 
     def _run_pipeline(self):
@@ -211,7 +234,7 @@ class IngestionWorker(threading.Thread):
             )
 
         self._set_status("Starting LLM judge", 0, 0, state="judging")
-        judge_sessions(concurrency=concurrency, progress_callback=on_judge_progress)
+        judged = judge_sessions(concurrency=concurrency, progress_callback=on_judge_progress)
 
         # Phase 3: recompute baselines/prescriptions with new judgments
         self._set_status("Recomputing baselines", 1, 2)
@@ -219,7 +242,7 @@ class IngestionWorker(threading.Thread):
         self._set_status("Regenerating prescriptions", 2, 2)
         generate_prescriptions()
 
-        self._set_idle()
+        self._set_idle(judged=judged)
 
     def _run_fill_narratives(self, concurrency: int = 12):
         """Re-judge only sessions that are missing narrative text."""

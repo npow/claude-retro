@@ -564,6 +564,7 @@ def api_overview():
     stats = conn.execute(f"""
         SELECT
             COUNT(*) as total_sessions,
+            COUNT(DISTINCT COALESCE(s.agent_type, 'unknown')) as total_agent_types,
             AVG(convergence_score) as avg_convergence,
             AVG(drift_score) as avg_drift,
             AVG(thrash_score) as avg_thrash,
@@ -624,14 +625,15 @@ def api_overview():
     return jsonify(
         {
             "total_sessions": total_sessions,
-            "avg_convergence": round(stats[1] or 0, 3),
-            "avg_drift": round(stats[2] or 0, 3),
-            "avg_thrash": round(stats[3] or 0, 3),
-            "total_hours": round(stats[4] or 0, 1),
-            "total_projects": stats[5],
-            "avg_turns": round(stats[6] or 0, 1),
-            "total_messages": stats[7] or 0,
-            "active_days": stats[8] or 0,
+            "total_agent_types": int(stats[1] or 0),
+            "avg_convergence": round(stats[2] or 0, 3),
+            "avg_drift": round(stats[3] or 0, 3),
+            "avg_thrash": round(stats[4] or 0, 3),
+            "total_hours": round(stats[5] or 0, 1),
+            "total_projects": stats[6],
+            "avg_turns": round(stats[7] or 0, 1),
+            "total_messages": stats[8] or 0,
+            "active_days": stats[9] or 0,
             "msgs_per_session_avg": avg_msgs,
             "msgs_per_session_median": median_msgs,
             "msgs_per_session_p90": p90_msgs,
@@ -641,13 +643,13 @@ def api_overview():
             else 0,
             "trajectory_distribution": {t: c for t, c in trajectory_dist},
             "baselines": [_row_to_dict(b, baseline_cols) for b in baselines],
-            "total_tool_calls": int(stats[9] or 0),
-            "total_input_tokens": int(stats[10] or 0),
-            "total_output_tokens": int(stats[11] or 0),
+            "total_tool_calls": int(stats[10] or 0),
+            "total_input_tokens": int(stats[11] or 0),
+            "total_output_tokens": int(stats[12] or 0),
             # Estimated cost: Sonnet 3.5/3.7 pricing ($3/MTok in, $15/MTok out)
             "estimated_cost_usd": round(
-                (stats[10] or 0) / 1_000_000 * 3.0
-                + (stats[11] or 0) / 1_000_000 * 15.0,
+                (stats[11] or 0) / 1_000_000 * 3.0
+                + (stats[12] or 0) / 1_000_000 * 15.0,
                 2,
             ),
         }
@@ -658,6 +660,7 @@ def api_overview():
 def api_sessions():
     conn = get_conn()
     project = request.args.get("project")
+    agent_type = request.args.get("agent_type")
     intent = request.args.get("intent")
     trajectory = request.args.get("trajectory")
     search = request.args.get("search")
@@ -691,6 +694,9 @@ def api_sessions():
     if project:
         conditions.append("s.project_name = ?")
         params.append(project)
+    if agent_type:
+        conditions.append("COALESCE(s.agent_type, 'unknown') = ?")
+        params.append(agent_type)
     if intent:
         conditions.append("s.intent = ?")
         params.append(intent)
@@ -710,6 +716,7 @@ def api_sessions():
     rows = conn.execute(
         f"""
         SELECT s.session_id, s.project_name, s.started_at, s.ended_at, s.duration_seconds,
+               COALESCE(s.agent_type, 'unknown') as agent_type,
                s.user_prompt_count, s.assistant_msg_count, s.tool_use_count, s.tool_error_count,
                s.turn_count, s.first_prompt, s.intent, s.trajectory,
                s.convergence_score, s.drift_score, s.thrash_score,
@@ -729,6 +736,7 @@ def api_sessions():
         "started_at",
         "ended_at",
         "duration_seconds",
+        "agent_type",
         "user_prompt_count",
         "assistant_msg_count",
         "tool_use_count",
@@ -922,12 +930,20 @@ def api_session_rich_timeline(session_id):
     conn = get_conn()
 
     row = conn.execute(
-        "SELECT project_name FROM sessions WHERE session_id = ?", [session_id]
+        "SELECT project_name, COALESCE(agent_type, 'unknown') FROM sessions WHERE session_id = ?",
+        [session_id],
     ).fetchone()
     if not row:
         return jsonify({"error": "Session not found", "timeline": []}), 404
 
-    project_name = row[0]
+    project_name, sess_agent_type = row[0], row[1]
+    if sess_agent_type != "claude":
+        return jsonify(
+            {
+                "error": f"Rich timeline JSONL replay currently supports Claude sessions only (got agent_type={sess_agent_type})",
+                "timeline": [],
+            }
+        ), 400
     jsonl_path = CLAUDE_PROJECTS_DIR / project_name / f"{session_id}.jsonl"
 
     if not jsonl_path.exists():
@@ -1233,10 +1249,17 @@ def api_tools():
 @app.route("/api/projects")
 def api_projects():
     conn = get_conn()
+    agent_type = request.args.get("agent_type")
+    params = []
+    agent_filter = ""
+    if agent_type:
+        agent_filter = "AND COALESCE(s.agent_type, 'unknown') = ?"
+        params.append(agent_type)
 
     rows = conn.execute("""
         SELECT
             s.project_name,
+            COALESCE(s.agent_type, 'unknown') as agent_type,
             COUNT(*) as session_count,
             AVG(s.convergence_score) as avg_convergence,
             AVG(s.drift_score) as avg_drift,
@@ -1255,12 +1278,14 @@ def api_projects():
         LEFT JOIN session_judgments j ON s.session_id = j.session_id
         WHERE s.turn_count >= 1
           AND s.first_prompt NOT LIKE 'You are analyzing a Claude Code session%%'
+          {agent_filter}
         GROUP BY s.project_name
         ORDER BY session_count DESC
-    """).fetchall()
+    """.format(agent_filter=agent_filter), params).fetchall()
 
     cols = [
         "project_name",
+        "agent_type",
         "session_count",
         "avg_convergence",
         "avg_drift",
@@ -1278,6 +1303,28 @@ def api_projects():
     return jsonify(
         {
             "projects": [_row_to_dict(r, cols) for r in rows],
+        }
+    )
+
+
+@app.route("/api/agent-types")
+def api_agent_types():
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT COALESCE(agent_type, 'unknown') AS agent_type, COUNT(*) AS session_count
+        FROM sessions
+        WHERE turn_count >= 1
+          AND first_prompt NOT LIKE 'You are analyzing a Claude Code session%%'
+        GROUP BY COALESCE(agent_type, 'unknown')
+        ORDER BY session_count DESC
+        """
+    ).fetchall()
+    return jsonify(
+        {
+            "agent_types": [
+                {"agent_type": r[0], "session_count": int(r[1] or 0)} for r in rows
+            ]
         }
     )
 
@@ -3678,6 +3725,12 @@ def api_live():
                 (SELECT project_name FROM raw_entries
                  WHERE session_id = rs.session_id
                    AND project_name IS NOT NULL LIMIT 1))                   AS project_name,
+            COALESCE(s.agent_type,
+                (SELECT agent_type FROM raw_entries
+                 WHERE session_id = rs.session_id
+                   AND agent_type IS NOT NULL
+                 ORDER BY timestamp_utc DESC LIMIT 1),
+                'unknown')                                                  AS agent_type,
             COALESCE(s.started_at,
                 (SELECT MIN(timestamp_utc) FROM raw_entries
                  WHERE session_id = rs.session_id))                         AS started_at,
@@ -3746,6 +3799,7 @@ def api_live():
             tool_started_at,
             is_running,
             project_name,
+            agent_type,
             started_at,
             last_active,
             first_prompt,
@@ -3812,6 +3866,7 @@ def api_live():
                 "toolStartedAt": tool_started_at if is_running else None,
                 "sessionId": session_id,
                 "projectName": project_name or "",
+                "agentType": agent_type or "unknown",
                 "startedAt": started_at or last_active,
                 "lastActivityAt": last_active,
                 "parentId": None,

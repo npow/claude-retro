@@ -18,13 +18,14 @@ def build_sessions():
 
         conn.execute("""
             INSERT OR REPLACE INTO sessions (
-                session_id, project_name, started_at, ended_at, duration_seconds,
+                session_id, project_name, agent_type, started_at, ended_at, duration_seconds,
                 user_prompt_count, assistant_msg_count, tool_use_count, tool_error_count,
                 turn_count, first_prompt
             )
             SELECT
                 agg.session_id,
                 agg.project_name,
+                agg.agent_type,
                 agg.started_at,
                 agg.ended_at,
                 agg.duration_seconds,
@@ -38,6 +39,7 @@ def build_sessions():
                 SELECT
                     session_id,
                     MAX(project_name) as project_name,
+                    COALESCE(MAX(CASE WHEN agent_type IS NOT NULL AND agent_type != '' AND agent_type != 'unknown' THEN agent_type END), 'unknown') as agent_type,
                     MIN(timestamp_utc) as started_at,
                     MAX(timestamp_utc) as ended_at,
                     CAST((julianday(MAX(timestamp_utc)) - julianday(MIN(timestamp_utc))) * 86400 AS INTEGER) as duration_seconds,

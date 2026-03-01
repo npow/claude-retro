@@ -27,6 +27,21 @@ class TestSessionsAPI:
         data = resp.get_json()
         assert data["total"] == 2
         assert len(data["sessions"]) == 2
+        assert all("agent_type" in s for s in data["sessions"])
+        assert all(s["agent_type"] in ("unknown", "claude", "codex", "cursor", "antigravity") for s in data["sessions"])
+
+    def test_filters_by_agent_type(self, client, seed_entries):
+        conn = seed_entries
+        conn.execute("UPDATE raw_entries SET agent_type = 'codex' WHERE session_id = 'sess-b'")
+        conn.execute("UPDATE raw_entries SET agent_type = 'claude' WHERE session_id = 'sess-a'")
+        conn.commit()
+        build_sessions()
+
+        resp = client.get("/api/sessions?limit=10&agent_type=codex")
+        data = resp.get_json()
+        assert data["total"] == 1
+        assert data["sessions"][0]["session_id"] == "sess-b"
+        assert data["sessions"][0]["agent_type"] == "codex"
 
     def test_unjudged_sessions_have_null_productivity(self, client):
         """Unjudged sessions must return null, NOT 0, for productivity_ratio."""
@@ -99,6 +114,7 @@ class TestOverviewAPI:
         data = resp.get_json()
         assert data["total_sessions"] == 2
         assert data["total_projects"] >= 1
+        assert "total_agent_types" in data
 
 
 class TestProductivityConsistency:

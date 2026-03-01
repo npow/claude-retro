@@ -101,6 +101,29 @@ def _init_extra_schema(conn: sqlite3.Connection):
             ("avg_duration_ms", "REAL DEFAULT 0"),
         ],
     )
+    # Backfill newer sessionlog columns when running against older wheels.
+    _migrate_add_columns(
+        conn,
+        "raw_entries",
+        [
+            ("agent_type", "TEXT DEFAULT 'unknown'"),
+        ],
+    )
+    _migrate_add_columns(
+        conn,
+        "progress_entries",
+        [
+            ("agent_type", "TEXT DEFAULT 'unknown'"),
+        ],
+    )
+    # sessions gains canonical agent type for multi-agent installs.
+    _migrate_add_columns(
+        conn,
+        "sessions",
+        [
+            ("agent_type", "TEXT DEFAULT 'unknown'"),
+        ],
+    )
     conn.commit()
 
 

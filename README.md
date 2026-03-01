@@ -79,6 +79,8 @@ Outcome distribution, score trends, baselines, activity heatmap, and per-project
 
 All analysis runs locally against `~/.claude/projects/`. Nothing leaves your machine except the LLM judging calls (which use your own `claude` CLI).
 
+Multi-agent note: when `sessionlog` ingests Codex/Cursor/Antigravity sources, Claude Retro now preserves `agent_type` on sessions and exposes it in APIs (`/api/sessions`, `/api/projects`, `/api/live`, `/api/agent-types`).
+
 ## Quick start
 
 ```bash

@@ -7,22 +7,28 @@ from claude_retro.sessions import build_sessions, build_tool_usage
 class TestBuildSessions:
     def test_basic_aggregation(self, seed_entries):
         """Sessions are built from raw_entries with correct counts."""
+        seed_entries.execute("UPDATE raw_entries SET agent_type = 'claude' WHERE session_id = 'sess-a'")
+        seed_entries.execute("UPDATE raw_entries SET agent_type = 'codex' WHERE session_id = 'sess-b'")
+        seed_entries.commit()
+
         n = build_sessions()
         assert n == 2  # sess-a and sess-b; sess-c excluded (single entry)
 
         conn = seed_entries
         rows = conn.execute(
-            "SELECT session_id, project_name, user_prompt_count, first_prompt "
+            "SELECT session_id, project_name, agent_type, user_prompt_count, first_prompt "
             "FROM sessions ORDER BY session_id"
         ).fetchall()
 
         assert rows[0][0] == "sess-a"
         assert rows[0][1] == "proj-x"
-        assert rows[0][2] == 2  # two user prompts
-        assert "auth flow" in rows[0][3]
+        assert rows[0][2] == "claude"
+        assert rows[0][3] == 2  # two user prompts
+        assert "auth flow" in rows[0][4]
 
         assert rows[1][0] == "sess-b"
-        assert rows[1][2] == 2  # two real user prompts (tool result doesn't count)
+        assert rows[1][2] == "codex"
+        assert rows[1][3] == 2  # two real user prompts (tool result doesn't count)
 
     def test_single_entry_session_excluded(self, seed_entries):
         """Sessions with only 1 entry are excluded (HAVING COUNT >= 2)."""

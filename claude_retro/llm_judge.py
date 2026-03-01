@@ -525,15 +525,20 @@ def judge_session(session_id: str, conn) -> dict:
 
 def _check_llm_reachable():
     """Raise a user-friendly RuntimeError if the LLM endpoint is unreachable."""
-    import urllib.request
-    import urllib.error
+    import socket
+    from urllib.parse import urlparse
 
     base_url = os.environ.get("ANTHROPIC_BASE_URL", _DEFAULT_BASE_URL)
     # Only pre-check for local relay URLs — the real Anthropic API doesn't need this
     if "localhost" not in base_url and "127.0.0.1" not in base_url:
         return
+    # TCP check — relay may 404 on GET / but port being open is sufficient
     try:
-        urllib.request.urlopen(base_url.rstrip("/") + "/", timeout=3)
+        parsed = urlparse(base_url)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 80
+        with socket.create_connection((host, port), timeout=3):
+            pass
     except Exception:
         raise RuntimeError(
             f"Cannot reach LLM relay at {base_url}. "

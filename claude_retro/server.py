@@ -434,8 +434,15 @@ def _check_llm_reachable_cached():
     if "localhost" not in base_url and "127.0.0.1" not in base_url:
         result = (True, base_url)
     else:
+        # Use TCP check — the relay returns 404 on GET / but the port being open is sufficient
+        import socket
         try:
-            urllib.request.urlopen(base_url.rstrip("/") + "/", timeout=2)
+            from urllib.parse import urlparse
+            parsed = urlparse(base_url)
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or 80
+            with socket.create_connection((host, port), timeout=2):
+                pass
             result = (True, base_url)
         except Exception:
             result = (False, base_url)
@@ -490,8 +497,11 @@ def api_diagnose():
     diag["llm_base_url"] = base_url
     diag["llm_model"] = model
     try:
-        import urllib.request
-        urllib.request.urlopen(base_url.rstrip("/") + "/", timeout=2)
+        import socket
+        from urllib.parse import urlparse as _urlparse
+        _p = _urlparse(base_url)
+        with socket.create_connection((_p.hostname or "127.0.0.1", _p.port or 80), timeout=2):
+            pass
         diag["llm_reachable"] = True
     except Exception as e:
         diag["llm_reachable"] = False

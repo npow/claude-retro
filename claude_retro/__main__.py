@@ -26,15 +26,15 @@ def _ensure_relay(port: int = 8082) -> bool:
         print(f"  claude-relay already running on port {port}")
         return True
 
-    relay_bin = shutil.which("claude-relay")
-    if not relay_bin:
-        print("  Warning: claude-relay not found on PATH — LLM Judge will not work.")
-        return False
-
     # Don't start relay inside a Claude Code session (would fail with nested session error)
     if os.environ.get("CLAUDECODE"):
         print(f"  Skipping claude-relay auto-start (running inside Claude Code session).")
-        print(f"  To enable LLM Judge, run: claude-relay serve --port {port}")
+        print(f"  To enable LLM Judge, run in a separate terminal: claude-relay serve --port {port}")
+        return False
+
+    relay_bin = shutil.which("claude-relay")
+    if not relay_bin:
+        print("  Warning: claude-relay not found on PATH — LLM Judge will not work.")
         return False
 
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}

@@ -110,9 +110,9 @@ Opens in your browser at `localhost:8420` (or the next free port if 8420 is busy
 | `ANTHROPIC_BASE_URL` | *(auto)* | Override LLM endpoint (e.g. `https://api.anthropic.com`) |
 | `ANTHROPIC_API_KEY` | `unused` | API key (only needed when using the real Anthropic API) |
 | `SENTRY_DSN` | *(unset)* | Enable Sentry error reporting when set |
-| `SENTRY_ENVIRONMENT` | *(unset)* | Optional environment tag (e.g. `dev`, `prod`) |
+| `SENTRY_ENVIRONMENT` | `local` | Environment tag sent to Sentry (e.g. `dev`, `prod`) |
 | `SENTRY_RELEASE` | package version | Optional release override sent to Sentry |
-| `SENTRY_TRACES_SAMPLE_RATE` | *(unset)* | Optional tracing sample rate between `0.0` and `1.0` |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.1` | Tracing sample rate between `0.0` and `1.0` |
 | `SENTRY_PROFILES_SAMPLE_RATE` | *(unset)* | Optional profiling sample rate between `0.0` and `1.0` |
 
 ## Requirements

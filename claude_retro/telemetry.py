@@ -8,11 +8,11 @@ import sentry_sdk
 _INITIALIZED = False
 
 
-def _sample_rate(var_name: str) -> float | None:
+def _sample_rate(var_name: str, default: float | None = None) -> float | None:
     """Read and validate a sample-rate env var in the inclusive range [0, 1]."""
     raw = os.environ.get(var_name, "").strip()
     if not raw:
-        return None
+        return default
     try:
         value = float(raw)
     except ValueError:
@@ -73,11 +73,9 @@ def init_sentry(
             "release": _release(),
         }
 
-        environment = os.environ.get("SENTRY_ENVIRONMENT", "").strip()
-        if environment:
-            kwargs["environment"] = environment
+        kwargs["environment"] = os.environ.get("SENTRY_ENVIRONMENT", "local").strip() or "local"
 
-        traces_rate = _sample_rate("SENTRY_TRACES_SAMPLE_RATE")
+        traces_rate = _sample_rate("SENTRY_TRACES_SAMPLE_RATE", default=0.1)
         if traces_rate is not None:
             kwargs["traces_sample_rate"] = traces_rate
 

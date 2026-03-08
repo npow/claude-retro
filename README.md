@@ -1,6 +1,7 @@
 # Agent Insights
 
 [![CI](https://github.com/npow/agent-insights/actions/workflows/ci.yml/badge.svg)](https://github.com/npow/agent-insights/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/agent-insights.svg)](https://pypi.org/project/agent-insights/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -39,20 +40,11 @@ pip install agent-insights
 agent-insights
 ```
 
-If `pip install agent-insights` returns `No matching distribution found`, install the currently published PyPI package name instead:
-
-```bash
-pip install claude-retro
-claude-retro
-```
-
 For background startup on reboot (macOS), run:
 
 ```bash
 agent-insights setup
 ```
-
-If you installed `claude-retro` from PyPI, use `claude-retro setup` instead.
 
 ## What it looks like
 
@@ -97,13 +89,6 @@ pip install agent-insights
 agent-insights
 ```
 
-PyPI fallback (current published package name):
-
-```bash
-pip install claude-retro
-claude-retro
-```
-
 Opens in your browser at `localhost:8420` (or the next free port if 8420 is busy). Sessions auto-refresh every 30 seconds. Hit "Run LLM Judge" to get AI analysis.
 
 ## Commands
@@ -115,8 +100,6 @@ Opens in your browser at `localhost:8420` (or the next free port if 8420 is busy
 | `agent-insights ingest` | Run full pipeline including LLM judging |
 | `agent-insights digest` | Print a weekly summary to stdout |
 | `agent-insights reset` | Delete the database and start fresh |
-
-If you installed from `pip install claude-retro`, use the same subcommands with the `claude-retro` executable.
 
 ## Configuration
 

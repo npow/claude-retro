@@ -3,7 +3,7 @@
 [![CI](https://github.com/npow/agent-insights/actions/workflows/ci.yml/badge.svg)](https://github.com/npow/agent-insights/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-insights.svg)](https://pypi.org/project/agent-insights/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Docs](https://img.shields.io/badge/docs-mintlify-18a34a?style=flat-square)](https://mintlify.com/npow/agent-insights)
 
 A sprint retro for your AI coding sessions. Reads your local Claude Code history, scores every session, and tells you what to change.
 
